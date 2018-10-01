@@ -1,6 +1,4 @@
-theme: jekyll-theme-cayman
-title: Francesco Serafini
-description: ciaooooo
+
 
 
 ## Welcome to GitHub Pages
