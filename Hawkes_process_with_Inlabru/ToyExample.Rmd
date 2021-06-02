@@ -164,6 +164,7 @@ library(ggplot2)
 library(inlabru)
 library(INLA)
 library(viridis)
+library(matrixStats)
 ```
 
 
@@ -345,13 +346,28 @@ pp.lambda <- function(tv, theta1, theta2, Ht){
 }
 
 
-pp.exp <- function(theta1, theta2, Ht){
-  ex <- 2*exp(theta1)
-  for(i in 1:length(Ht)){
-    th <- Ht[i]
-    ex <- ex + exp(-theta2)*(1 - exp(-exp(theta2)*(2 - th)))
-  }
-  ex
+# pp.exp <- function(theta1, theta2, Ht){
+#   ex <- 2*exp(theta1)
+#   for(i in 1:length(Ht)){
+#     th <- Ht[i]
+#     ex <- ex + exp(-theta2)*(1 - exp(-exp(theta2)*(2 - th)))
+#   }
+#   ex
+# } 
+pp.exp <- function(theta1, theta2, Ht, Tlim = 2){
+  bk <- log(Tlim) + theta1
+  diff <- Tlim - Ht
+  trig <- theta2 + log(diff)
+  trig <- -exp(trig)
+  idx <- (1 - exp(trig) < 1e-15) 
+  
+  # approximate for small values of 1 - exp(trig)
+  trig[idx] <- -theta2 + log(-trig[idx])
+  # otherwise use original expression
+  trig[!idx] <- -theta2 + log(1 - exp(trig[!idx]))
+  
+  v <- logSumExp(c(bk, trig))
+  exp(v)
 } 
 
 pp.loglik.s <- function(theta1, theta2, Ht){
@@ -380,7 +396,9 @@ Let's consider $Ht = \{0.5, 1.5\}$ and $W = [0,2]$. Below, the likelihood and th
 ```{r}
 ht = c(0.5, 1.5)
 theta.grid$loglik <- pp.loglik(theta.grid[,1],theta.grid[,2],ht)
-theta.grid$expec <- pp.exp(theta.grid[,1],theta.grid[,2],ht)
+theta.grid$expec <- sapply(1:nrow(theta.grid),
+                           function(x) 
+                             pp.exp(theta.grid[x,1],theta.grid[x,2],ht))
 
 pl.lik <- ggplot(theta.grid, aes(x = theta1, y = theta2, z = exp(loglik),
                        fill = exp(loglik))) + 
@@ -661,11 +679,12 @@ theta0.df <- data.frame(rbind(c(0, 2.75),
 
 ht = c(0.5,1.5)
 theta.grid$loglik <- pp.loglik(theta.grid$theta1, theta.grid$theta2, ht)
-theta.grid$expec <- pp.exp(theta.grid$theta1, theta.grid$theta2, ht)
+theta.grid$expec <- sapply(1:nrow(theta.grid), function(x) 
+  pp.exp(theta.grid$theta1[x], theta.grid$theta2[x], ht)
 
 # first point linearized log lik and linearized expectations 
-theta.grid$LINloglik.1 <- pp.lin.loglik(theta.grid$theta1, theta.grid$theta2, ht, 
-                       theta0.df[1,1], theta0.df[1,2])   
+theta.grid$LINloglik.1 <- pp.lin.loglik(theta.grid$theta1, theta.grid$theta2, ht,
+                                        theta0.df[1,1], theta0.df[1,2])   
 
 theta.grid$expec.lin1 <- sapply(1:nrow(theta.grid), function(i)
   integrate(function(x) 
@@ -1373,6 +1392,9 @@ posterior.to.optim <- function(param, Ht){
   -lik*prior
 } 
 
+
+
+
 posterior.approx <- function(param, Tt, Ht, theta10, theta20){
   theta1 = param[1]
   theta2 = param[2]
@@ -1600,6 +1622,8 @@ theta.grid2$post <- sapply(1:nrow(theta.grid2),
                           function(x) 
                             -posterior.to.optim(as.numeric(theta.grid2[x,1:2]),
                                                           ht))
+
+
 ggplot(theta.grid2, aes(x = theta1, y = theta2, z = post, fill = post)) + 
   geom_tile() + 
   geom_contour() + 
@@ -1618,6 +1642,7 @@ $$
 w = diff(theta1.post)[1]*diff(theta2.post)[2]
 integral = w*sum(theta.grid2$post)
 theta.grid2$true.post <- theta.grid2$post/integral
+
 theta.grid2$exp <- sapply(1:nrow(theta.grid2), 
                           function(x) pp.exp(theta.grid2$theta1[x],
                                              theta.grid2$theta2[x],
