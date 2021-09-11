@@ -41,39 +41,32 @@ brier.s <- brier.s*(log.score.second.der(pst, pst)/brier.score.second.der(pst))
 # create df for plotting 
 df = data.frame(p = rep(p.seq, 2),
                 Scores = c(brier.s, log.s),
-                id = rep(c('Brier Score', 'Log Score'), each = length(p.seq)))
-
-
-# create a plot from which we will extract only the legend
-p.leg <- ggplot(df, aes(x = p, y = Scores, ,color = id, linetype = id)) + 
-  geom_line() +
-  theme(legend.position = 'bottom',
-        legend.background = element_rect(#fill= 'lightgrey',
-          linetype="solid", 
-          colour ="darkgrey"),
-        legend.title = element_blank(),
-        legend.key.size = unit(3, 'line'),
-        legend.text = element_text(size = 15)) + 
-  guides(linetype = guide_legend(override.aes = list(size = 2))) 
-
-# extract leggend
-legend <- as_ggplot(cowplot::get_legend(p.leg))
+                Score = rep(c('Brier', 'Log'), each = length(p.seq)))
 
 # right plot
-p.right <- ggplot(df, aes(x = p, y = Scores, ,color = id, linetype = id)) + 
+p.right <- ggplot(df, aes(x = p, y = Scores, 
+                          color = Score, linetype = Score)) + 
   ylab(TeX("$E \\[ \\Delta \\]$"))  +
-  geom_vline(xintercept = 0) +
   geom_hline(yintercept = 0) +
-  geom_line(size = 1.5) +
+  geom_line() +
   geom_vline(xintercept = pst, linetype = 3) + 
-  geom_text(aes(x = pst+0.025 , y = -4 , label= 'p*'), color = 'black') +
+  annotate("text", x = 0.85, y = -2.4, 
+           label="(b)", color = "black") +
   theme_classic() + 
-  theme(legend.position = 'none') +
+  theme(legend.position = c(0.77, 0.8),
+        legend.background = element_rect(
+          colour ="darkgrey"),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) +
   ylim(-3, 0) +
   xlim(0,1)  
 
 # seq for left plot
-p.seq = seq(0, 0.01,length.out = 100)
+p.seq = seq(0, 0.006,length.out = 100)
 # compute scores
 brier.s <- brier(pst, p.seq) - brier(pst, pst)
 log.s <- log.sc(pst, p.seq) - log.sc(pst, pst)
@@ -83,24 +76,35 @@ brier.s <- brier.s*(log.score.second.der(pst, pst)/brier.score.second.der(pst))
 # create df
 df = data.frame(p = rep(p.seq, 2),
                 Scores = c(brier.s, log.s),
-                id = rep(c('Brier Score', 'Log Score'), each = length(p.seq)))
+                Score = rep(c('Brier', 'Log'), each = length(p.seq)))
 
 # left plot
-p.left <- ggplot(df, aes(x = p, y = Scores, ,color = id, linetype = id)) + 
+p.left <- ggplot(df, aes(x = p, y = Scores, 
+                         color = Score, linetype = Score)) + 
   ylab(TeX("$E \\[ \\Delta \\]$")) +
-  geom_vline(xintercept = 0) +
   geom_hline(yintercept = 0) +
-  geom_line(size = 1.5) +
-  geom_vline(xintercept = pst, linetype = 3) + 
-  geom_text(aes(x = pst +0.0003 , y = -0.006 , label= 'p*'), color = 'black') +
+  geom_line() +
+  geom_vline(xintercept = pst, linetype = 3) +
+  annotate("text", x = 0.005, y = -0.004, 
+           label="(a)", color = "black") +
+  annotate("text", x = pst +0.0006, y = -0.005, 
+           label=TeX('p^*'), color = "black", parse = TRUE) +
   theme_classic() + 
-  theme(legend.position = 'none')+
+  theme(legend.position = c(0.77, 0.8),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))+
   ylim(-0.005,0) +  
-  xlim(0,0.005)  
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+  
 
-# create plot
-png('images/figure1.png', width = 480*1.5, height = 480*0.75)
-multiplot(p.left, p.right, legend, cols = 2, layout = matrix(c(1,2,1,2,1,2,3,3), byrow = T, ncol = 2))
+
+pdf('images/figure1.pdf', width = 4, height = 3)
+multiplot(p.left, p.right, cols = 2)
 dev.off()
 
 ####################################################
@@ -115,29 +119,45 @@ p1.v <- seq(0, 4*pst, length.out = 100)
 p2.v <- c(pst, pst*2, pst*4)
 
 p.left <- toplot.gambling(p1.v, pst, p2.v, k = 2) + 
-  geom_vline(xintercept = pst - (p2.v - pst), linetype = 3, color = hue_pal()(3)) +
-  geom_vline(xintercept = pst - (p2.v - pst), linetype = 3, color = hue_pal()(3)) + 
   geom_vline(xintercept = pst) + 
-  xlim(0, 0.004)+
   ylim(-1,1.2) + 
-  theme_classic()
+  annotate("text", x = 0.0035, y = -0.3, 
+           label="(a)", color = "black") +
+  theme_classic() +
+  theme(legend.position = c(0.77, 0.8),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) +  
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
-
+  
 p2.v <- c(pst, pst/4, pst/2)
 p.right <- toplot.gambling(p1.v, pst, p2.v, k = 2) + 
-  geom_vline(xintercept = pst - (p2.v - pst), linetype = 3, color = hue_pal()(3)) +
-  geom_vline(xintercept = pst + (p2.v - pst), linetype = 3, color = hue_pal()(3)) + 
   geom_vline(xintercept = pst)+
   ylim(-1,1.2) + 
-  theme_classic() 
+  annotate("text", x = 0.0035, y = -0.3, 
+           label="(b)", color = "black") +
+  theme_classic() +
+  theme(legend.position = c(0.77, 0.8),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))+  
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
 
-# create plot
-  png('images/figure2.png', width = 480*1.5, height = 480*0.75)
-  multiplot(p.left, p.right, cols = 2)
-  dev.off()
 
 
+pdf('images/figure2.pdf', width = 4, height = 3)
+multiplot(p.left, p.right, cols = 2)
+dev.off()
 ####################################################
 ################ FIGURE 3 ##########################
 ####################################################
@@ -146,26 +166,50 @@ p.right <- toplot.gambling(p1.v, pst, p2.v, k = 2) +
 p3 <- c(pst, pst/3, pst/2)
 
 p.left <- toplot.gambling.diff(p1.v, pst, pst, p3, k = 3) +   
-  geom_vline(xintercept = pmax(2*pst - p3, 0), linetype = 2, color = hue_pal()(3) ) + 
+  # geom_vline(xintercept = pmax(2*pst - p3, 0), linetype = 2, color = hue_pal()(3) ) + 
   geom_vline(xintercept = pst)+
   ylab(TeX("$E \\[ \\Delta \\]$"))  +
   ylim(-1,0.2) + 
-  theme_classic() 
+  annotate("text", x = 0.0005, y = -0.75, 
+           label="(a)", color = "black") +
+  theme_classic() +
+  theme(legend.position = c(0.77, 0.8),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))+  
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 
 # set p3 values
 p3 <- c(pst, pst*3, pst*2)
 p.right <- toplot.gambling.diff(p1.v, pst, pst, p3, k = 3) +
-  geom_vline(xintercept = pmax(2*pst - p3,0), linetype = 2 , color = hue_pal()(3), 
-             alpha = 0.75) +
+  # geom_vline(xintercept = pmax(2*pst - p3,0), linetype = 2 , color = hue_pal()(3), 
+  #            alpha = 0.75) +
   geom_vline(xintercept = pst)+
   ylab(TeX("$E \\[ \\Delta \\]$"))  +
   ylim(-1,0.2) + 
-  theme_classic() 
+  annotate("text", x = 0.0005, y = -0.75, 
+           label="(b)", color = "black") +
+  theme_classic() +
+  theme(legend.position = c(0.77, 0.8),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))+  
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
-png('images/figure3.png', width = 480*1.5, height = 480*0.75)
+
+
+pdf('images/figure3.pdf', width = 4, height = 3)
 multiplot(p.left, p.right, cols = 2)
 dev.off()
-
 
 ####################################################
 ################ FIGURE 4 ##########################
@@ -179,44 +223,51 @@ k.v <- c(3,5,10,20)
 p.lim <- (k.v)*pst - ((k.v-2)*p3 + pst)
 # set sequence
 p1.v <- seq(0, max(p.lim),length.out = 1000)
-# plot for the legend
-p.leg <- toplot.gambling.k(p1.v, pst, pst, p3, k.v  = k.v) + 
-  theme_classic() + 
-  theme(legend.position = 'bottom',
-        legend.background = element_rect(#fill= 'lightgrey',
-          linetype="solid", 
-          colour ="darkgrey"),
-        legend.title = element_blank(),
-        legend.key.size = unit(3, 'line'),
-        legend.text = element_text(size = 15)) + 
-  guides(linetype = guide_legend(override.aes = list(size = 2))) 
-
-# extract legend
-legend <- as_ggplot(cowplot::get_legend(p.leg))
 
 # 
 pl.left <- toplot.gambling.k(p1.v, pst, pst, p3, k.v = k.v) + 
-  geom_vline(xintercept = p.lim, linetype = 2, color = hue_pal()(length(p.lim))) +
   ylim(-0.002, 0.0015) +
+  ylab(TeX("$E \\[ \\Delta \\]$")) +
   theme_classic() +
-  theme(legend.position = 'none') +
-  ylab(TeX("$E \\[ \\Delta \\]$"))  
+  theme(legend.position = c(0.77, 0.8),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))+  
+  annotate("text", x = 0.009, y = -0.001, 
+           label="(a)", color = "black") +
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 # same 
 p3 <- pst*2
 k.v <- c(3,5,10,20)
 p.lim <- sapply(1:length(k.v), function(x) max(0,(k.v[x])*pst - ((k.v[x]-2)*p3 + pst)))
+p1.v <- seq(0, 0.005,length.out = 1000)
 
 pl.right <- toplot.gambling.k(p1.v, pst, pst, p3, k.v = k.v) + 
-  geom_vline(xintercept = p.lim, linetype = 2, color = hue_pal()(length(p.lim))) +
   ylim(-0.002, 0.0015) +
-  xlim(0,0.005) +
   theme_classic() + 
-  theme(legend.position = 'none') +
-  ylab(TeX("$E \\[ \\Delta \\]$"))  
+  ylab(TeX("$E \\[ \\Delta \\]$")) +
+  theme(legend.position = c(0.77, 0.8),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))+  
+  annotate("text", x = 0.004, y = -0.001, 
+           label="(b)", color = "black") +
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
-png('images/figure4.png', width = 480*1.5, height = 480*0.75)
-multiplot(pl.left, pl.right, legend, layout = matrix(c(1,2,1,2,1,2,3,3), byrow = T, ncol = 2))
+
+pdf('images/figure4.pdf', width = 4, height = 3)
+multiplot(pl.left, pl.right, cols = 2)
 dev.off()
+
 
 
 ####################################################
@@ -272,103 +323,126 @@ if(is.infinite(Xs.min.pg)){Xs.min.pg = NULL}
 Xs.min.fg <-  res.fg$extremes[1]
 
 CIplot.b <- ggplot(CI.b, aes(x = Xs, y = -obs/min(lower))) +
-  geom_step() +
+  geom_step(size = 0.3) +
   geom_rect(aes(ymin = -lower/min(lower), 
                 ymax = -upper/min(lower),
                 xmin = Xs, xmax = lead(Xs)), 
             fill = 'orange', 
             alpha = 0.3, size = 0.1) +
-  geom_step(aes(x = Xs, y = -lower/min(lower)), color = 'red') +
-  geom_step(aes(x = Xs, y = -upper/min(lower)), color = 'red') +
+  geom_step(aes(x = Xs, y = -lower/min(lower)), color = 'red',
+            size = 0.3) +
+  geom_step(aes(x = Xs, y = -upper/min(lower)), color = 'red',
+            size = 0.3) +
   geom_hline(yintercept = 0) + 
   xlab('Xs') +
   ylab(TeX('$E \\[ \\Delta \\]$')) + 
   geom_vline(xintercept = Xs.max.b, linetype = 2,
-             size = 0.5) +
+             size = 0.2) +
   geom_vline(xintercept = Xs.min.b, linetype = 2,
-             size = 0.5) + 
-  annotate("text", x = 0, y = 5, label = '(a)', size = 6)+ 
-  annotate("text", x = 1, y = 4, label = bquote(p[2])) +
-  annotate("text", x = 7, y = 4, label = 'no pref') +
-  annotate("text", x = 15, y = 4, label = bquote(p[1])) +
+             size = 0.2) + 
+  annotate("text", x = 20, y = 4.6, label = '(a)', size = 3) + 
+  annotate("text", x = 1, y = 4, label = bquote(p[2]),size = 2) +
+  annotate("text", x = 7, y = 4, label = 'no pref', size = 2) +
+  annotate("text", x = 15, y = 4, label = bquote(p[1]), size = 2) +
   ylim(-1,5.4) + 
-  theme_classic()  
+  theme_classic() +
+  theme(axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))
 
 
 CIplot.l <- ggplot(CI.l, aes(x = Xs, y = -obs/min(lower))) +
-  geom_step() +
+  geom_step(size = 0.3) +
   geom_rect(aes(ymin = -lower/min(lower), 
                 ymax = -upper/min(lower),
                 xmin = Xs, xmax = lead(Xs)), 
             fill = 'orange', 
-            alpha = 0.3, size = 0.1) +
-  geom_step(aes(x = Xs, y = -lower/min(lower)), color = 'red') +
-  geom_step(aes(x = Xs, y = -upper/min(lower)), color = 'red') +
+            alpha = 0.3) +
+  geom_step(aes(x = Xs, y = -lower/min(lower)), color = 'red',
+            size = 0.3) +
+  geom_step(aes(x = Xs, y = -upper/min(lower)), color = 'red',
+            size = 0.3) +
   geom_hline(yintercept = 0) + 
   xlab('Xs') + 
   ylab(TeX('$E \\[ \\Delta \\]$')) + 
   geom_vline(xintercept = Xs.max.l, linetype = 2,
-             size = 0.5) +
+             size = 0.2) +
   geom_vline(xintercept = Xs.min.l, linetype = 2,
-             size = 0.5) + 
-  annotate("text", x = 0, y = 5, label = '(c)', size = 6)+
-  annotate("text", x = 0.5, y = 4, label = bquote(p[2])) +
-  annotate("text", x = 6, y = 4, label = 'no pref') +
-  annotate("text", x = 15, y = 4, label = bquote(p[1])) +
+             size = 0.2) + 
+  annotate("text", x = 20, y = 4.6, label = '(c)', size = 3)+
+  annotate("text", x = 0.5, y = 4, label = bquote(p[2]), size = 2) +
+  annotate("text", x = 6, y = 4, label = 'no pref', size = 2) +
+  annotate("text", x = 15, y = 4, label = bquote(p[1]), size = 2) +
   ylim(-1,5.4) +
-  theme_classic() 
+  theme_classic() +
+  theme(axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))
+
 
 CIplot.pg <- ggplot(CI.pg, aes(x = Xs, y = -obs/min(lower))) +
-  geom_step() +
+  geom_step(size = 0.3) +
   geom_rect(aes(ymin = -lower/min(lower), 
                 ymax = -upper/min(lower),
                 xmin = Xs, xmax = lead(Xs)), 
             fill = 'orange', 
-            alpha = 0.3, size = 0.1) +
-  geom_step(aes(x = Xs, y = -lower/min(lower)), color = 'red') +
-  geom_step(aes(x = Xs, y = -upper/min(lower)), color = 'red') +
+            alpha = 0.3) +
+  geom_step(aes(x = Xs, y = -lower/min(lower)), color = 'red',
+            size = 0.3) +
+  geom_step(aes(x = Xs, y = -upper/min(lower)), color = 'red',
+            size = 0.3) +
   geom_hline(yintercept = 0) + 
   geom_vline(xintercept = Xs.max.pg, linetype = 2,
-             size = 0.5) +
+             size = 0.2) +
   geom_vline(xintercept = Xs.min.pg, linetype = 2,
-             size = 0.5) +
+             size = 0.2) +
   ylab(TeX('$E \\[ \\Delta \\]$')) + 
   xlab('Xs') + 
-  annotate("text", x = 0, y = 5, label = '(b)', size = 6) +
-  annotate("text", x = 3, y = 4, label = bquote(p[2])) +
-  annotate("text", x = 14, y = 4, label = 'no pref') +
-  annotate("text", x = 25, y = 4, label = bquote(p[1])) +
+  annotate("text", x = 2, y = 1.5, label = '(b)', size = 3) +
+  annotate("text", x = 3, y = 4, label = bquote(p[2]), size = 2) +
+  annotate("text", x = 14, y = 4, label = 'no pref', size = 2) +
+  annotate("text", x = 25, y = 4, label = bquote(p[1]), size = 2) +
   ylim(-1,5.4) +
-  theme_classic() 
+  theme_classic() +
+  theme(axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))
+
 
 
 CIplot.fg <- ggplot(CI.fg, aes(x = Xs, y = -obs/min(lower))) +
-  geom_step() +
+  geom_step(size = 0.3) +
   geom_rect(aes(ymin = -lower/min(lower), 
                 ymax = -upper/min(lower),
                 xmin = Xs, xmax = lead(Xs)), 
             fill = 'orange', 
-            alpha = 0.3, size = 0.1) +
-  geom_step(aes(x = Xs, y = -lower/min(lower)), color = 'red') +
-  geom_step(aes(x = Xs, y = -upper/min(lower)), color = 'red') +
+            alpha = 0.3) +
+  geom_step(aes(x = Xs, y = -lower/min(lower)), color = 'red',
+            size = 0.3) +
+  geom_step(aes(x = Xs, y = -upper/min(lower)), color = 'red',
+            size = 0.3) +
   geom_hline(yintercept = 0) + 
-  xlab('Xs') + 
-  geom_vline(xintercept = Xs.max.fg, linetype = 2,
-             size = 0.5) +
-  geom_vline(xintercept = Xs.min.fg, linetype = 2,
-             size = 0.5) +
-  ylab(TeX('$E \\[ \\Delta \\]$')) + 
-  annotate("text", x = 0, y = 5, label = '(d)', size = 6)+
-  annotate("text", x = 1, y = 4, label = bquote(p[2])) +
-  annotate("text", x = 7, y = 4, label = 'no pref') +
-  annotate("text", x = 15, y = 4, label = bquote(p[1])) +
+  labs(x = TeX('X_S'),
+       y = TeX('$E \\[ \\Delta \\]$')) + 
+  geom_vline(xintercept = Xs.max.fg, linetype = 2, size = 0.2) +
+  geom_vline(xintercept = Xs.min.fg, linetype = 2, size = 0.2) +
+  annotate("text", x = 20, y = 4.6, label = '(d)', size = 3)+
+  annotate("text", x = 1, y = 4, label = bquote(p[2]), size = 2) +
+  annotate("text", x = 7, y = 4, label = 'no pref', size = 2) +
+  annotate("text", x = 15, y = 4, label = bquote(p[1]), size = 2) +
   ylim(-1,5.4) +
-  theme_classic()
+  theme_classic() +
+  theme(axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))
 
-png('images/figure5.png', width = 480*1.5, height = 480*0.75)
+
+
+pdf('images/figure5.pdf', width = 4, height = 3)
 multiplot(CIplot.b, CIplot.l, CIplot.pg, CIplot.fg,
           cols = 2)
 dev.off()
+
+
+
+
+
 
 ####################################################
 ################ TABLE 1 ##########################
@@ -476,15 +550,19 @@ prob.plot.b <- ggplot(df.b, aes(x = pstar, y = probs,
   geom_vline(xintercept = p2, linetype = 4) +
   geom_vline(xintercept = p1, linetype = 4) +
   #geom_vline(xintercept = (p1 + p2)/2, linetype = 2) +
-  annotate('text', x = p2 + 0.0001/2, y = 0.5, label = TeX('p_2')) + 
-  annotate('text', x = p1 + 0.0001/2, y = 0.5, label = TeX('p_1')) +
+  annotate('text', x = 0.0018, y = 0.5, label = "(a)") + 
+  annotate('text', x = p2 + 0.0001, y = 0.5, label = TeX('p_2'), size = 3) + 
+  annotate('text', x = p1 + 0.0001, y = 0.5, label = TeX('p_1'), size = 3) +
   xlab(TeX('p^*')) + 
   ylab('Pr') +
   theme_classic() + 
   theme(legend.background = element_rect(#fill= 'lightgrey',
     linetype="solid", 
     colour ="darkgrey"),
-    legend.key.size = unit(1, 'line'))  
+    legend.key.size = unit(1, 'line'),
+    axis.text = element_text(size = 5),
+    axis.title = element_text(size = 7)) 
+
 
 
 
@@ -495,20 +573,24 @@ prob.plot.pg <- ggplot(df.pg, aes(x = pstar, y = probs,
   geom_vline(xintercept = p2, linetype = 4) +
   geom_vline(xintercept = p1, linetype = 4) +
   #geom_vline(xintercept = (p1 + p2)/2, linetype = 2) +
-  annotate('text', x = p2 + 0.0001/2, y = 0.5, label = TeX('p_2')) + 
-  annotate('text', x = p1 + 0.0001/2, y = 0.5, label = TeX('p_1')) +
+  annotate('text', x = 0.0018, y = 0.5, label = "(b)") + 
+  annotate('text', x = p2 + 0.0001, y = 0.5, label = TeX('p_2'), size = 3) + 
+  annotate('text', x = p1 + 0.0001, y = 0.5, label = TeX('p_1'), size = 3) +
   xlab(TeX('p^*')) + 
   ylab('Pr') +
   theme_classic() + 
   theme(legend.background = element_rect(#fill= 'lightgrey',
     linetype="solid", 
     colour ="darkgrey"),
-    legend.key.size = unit(1, 'line'))  
+    legend.key.size = unit(1, 'line'),
+    axis.text = element_text(size = 5),
+    axis.title = element_text(size = 7))  
 
 
-png('images/figure6.png', width = 480*1.5, height = 480*0.75)
+pdf('images/figure6.pdf', width = 4, height = 3)
 multiplot(prob.plot.b, prob.plot.pg)
 dev.off()
+
 
 
 
@@ -520,8 +602,14 @@ dev.off()
 pstar.v = seq(1e-6, 2e-3, length.out = 100)
 N.bins.vec <- c(2000, 5000, 10000, 20000)
 
+library(RColorBrewer)
+pal.green <- colorRampPalette(brewer.pal(9, "Greens"))(5)[2:5]
+
 # create plot for brier (ignore warnings)
-beta.b <- toplot.beta(p1, p2, p0, pstar.v, N.bins.vec, brier, 'right') 
+beta.b <- toplot.beta(p1, p2, p0, pstar.v, N.bins.vec, brier, 'right') +
+  annotate('text', x = 0, y = 0.15, label = "(a)") +
+  scale_color_manual(values = pal.green) 
+  
 
 # finds prob for the scores
 db.b <- sapply(pstar.v, 
@@ -541,35 +629,29 @@ beta.v <- c(1 - db.b[1,],
 # set names
 idx.v <- rep(c('Brier', 'Log', 'PG', 'FG'), each = length(pstar.v))
 
-# legend plot
-pl.leg <- ggplot(data.frame(beta = beta.v, 
-                            score = idx.v,
-                            pstar = rep(pstar.v, 4)), 
-                 aes(x = pstar, y = beta, linetype = score, color = score)) + geom_line() + 
-  scale_color_brewer(palette="Dark2") + 
-  theme_classic() + 
-  theme(legend.position = 'bottom',
-        legend.background = element_rect(#fill= 'lightgrey',
-          linetype="solid", 
-          colour ="darkgrey"),
-        legend.key.size = unit(2, 'line'))  + 
-  guides(linetype = guide_legend(override.aes = list(size = 2)))
-
-
-leg <- as_ggplot(get_legend(pl.leg))
-
 # top plot
 pl1 <- ggplot(data.frame(beta = beta.v, 
                          score = idx.v,
                          pstar = rep(pstar.v, 4)), 
               aes(x = pstar, y = beta, linetype = score,, color = score)) + geom_line() + 
   scale_color_brewer(palette="Dark2") + 
+  annotate('text', x = 0.00005, y = 0.15, label = "(b)", 
+           size = 3) + 
   geom_vline(xintercept = p1, linetype = 3) +
   geom_vline(xintercept = p2, linetype = 3) +
   xlab(TeX('p^*')) + 
   ylab(expression(beta)) + 
   theme_classic() + 
-  theme(legend.position = 'none')  
+  theme(legend.position = c(0.82, 0.8),
+        legend.key.width = unit(0.22,"cm"),
+        legend.key.height = unit(0.22,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 6),
+        legend.text = element_text(size = 4),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))+  
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 
 
 # find probs for different number of bins
@@ -596,16 +678,26 @@ pl2 <- ggplot(data.frame(beta = beta.v,
   geom_vline(xintercept = p1, linetype = 3) +
   geom_vline(xintercept = p2, linetype = 3) +
   xlab(TeX('p^*')) + 
+  annotate('text', x = 0.00005, y = 0.15, label = "(c)",
+           size = 3) +
   ylab(expression(beta)) + 
   theme_classic() + 
-  theme(legend.position = 'none') 
+  theme(legend.position = c(0.82, 0.8),
+        legend.key.width = unit(0.22,"cm"),
+        legend.key.height = unit(0.22,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 6),
+        legend.text = element_text(size = 4),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) +
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
-png('images/figure7.png', width = 480*1.5, height = 480*0.75)
-multiplot(beta.b, pl1, pl2, leg, layout = matrix(c(1,1,1,1,1,1,
-                                                   2,3,2,3,4,4), byrow = T, 
+pdf('images/figure7.pdf', width = 4, height = 3)
+multiplot(beta.b, pl1, pl2, layout = matrix(c(1,1,2,3), byrow = T, 
                                                  ncol = 2))
 
 dev.off()
+
 
 
 
@@ -653,17 +745,25 @@ df.b$N <- as.factor(df.b$N)
 
 # create top plot
 alpha.beta.pl <- ggplot(df.b, 
-                        aes(x = alpha, y = 1 - probs, linetype = N, color = N)) + 
+                        aes(x = alpha, y = 1 - probs, 
+                            linetype = N, color = N)) + 
   geom_line() + 
   geom_vline(xintercept = 1, linetype = 2) +
   labs(color = 'N') + 
-  xlab(expression(gamma)) + 
+  xlab(expression(omega)) + 
   ylab(expression(beta)) +
-  theme_classic() +  
-  theme(legend.background = element_rect(#fill= 'lightgrey',
-    linetype="solid", 
-    colour ="darkgrey"),
-    legend.key.size = unit(1, 'line'))
+  theme_classic() + 
+  theme(legend.position = c(0.82, 0.68),
+        legend.key.width = unit(0.29,"cm"),
+        legend.key.height = unit(0.29,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 7),
+        legend.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) + 
+  annotate('text', x = 0, y = 0.85, label = "(a)") +
+  scale_color_manual(values = pal.green) 
+
 
 
 
@@ -687,20 +787,6 @@ beta.v2 <- c(1 - db.b2[1,],
 # set score names
 idx.v2 <- rep(c('Brier', 'Log', 'PG', 'FG'), each = length(p2.v))
 
-# legend plot
-pl.leg2 <- ggplot(data.frame(beta = beta.v2, 
-                             score = idx.v2,
-                             p2v = rep(p2.v, 4)), 
-                  aes(x = p2v/p1, y = beta, linetype = score, color = score)) + geom_line() + 
-  scale_color_brewer(palette="Dark2") + 
-  theme_classic() + 
-  theme(legend.position = 'bottom',
-        legend.key.size = unit(2, 'line')) + 
-  guides(linetype = guide_legend(override.aes = list(size = 2)))
-
-
-leg2 <- as_ggplot(get_legend(pl.leg2))
-
 # left plot
 pl12 <- ggplot(data.frame(beta = beta.v2, 
                           score = idx.v2,
@@ -708,10 +794,22 @@ pl12 <- ggplot(data.frame(beta = beta.v2,
                aes(x = p2v/p1, y = beta, color = score, linetype = score)) + geom_line() + 
   scale_color_brewer(palette="Dark2") + 
   geom_vline(xintercept = 1, linetype = 3) +
-  xlab(expression(gamma)) +
+  xlab(expression(omega)) +
   ylab(expression(beta)) + 
   theme_classic() + 
-  theme(legend.position = 'none')
+  ylim(0,1) +
+  annotate('text', x = 3.5, y = 0.15, label = "(b)",
+           size = 3) +
+  theme(legend.position = c(0.82, 0.8),
+        legend.key.width = unit(0.22,"cm"),
+        legend.key.height = unit(0.22,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 6),
+        legend.text = element_text(size = 4),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) +
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 
 
 # repeat everything with N = 20000
@@ -740,18 +838,30 @@ pl22 <- ggplot(data.frame(beta = beta.v2,
                aes(x = p2v/p1, y = beta, color = score, linetype = score)) + geom_line() + 
   scale_color_brewer(palette="Dark2") + 
   geom_vline(xintercept = 1, linetype = 3) +
-  xlab(expression(gamma)) + 
+  xlab(expression(omega)) + 
   ylab(expression(beta)) + 
-  theme_classic() + 
-  theme(legend.position = 'none') 
+  theme_classic() +
+  ylim(0,1) +
+  annotate('text', x = 3.5, y = 0.15, label = "(c)",
+           size = 3) +
+  theme(legend.position = c(0.82, 0.8),
+        legend.key.width = unit(0.22,"cm"),
+        legend.key.height = unit(0.22,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 6),
+        legend.text = element_text(size = 4),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) +
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
 
-png('images/figure8.png', width = 480*1.5, height = 480*0.75)
-multiplot(alpha.beta.pl, pl12, pl22, leg2, 
-          layout = matrix(c(1,1,1,1,1,1,2,3,2,3,4,4), 
+pdf('images/figure8.pdf', width = 4, height = 3)
+multiplot(alpha.beta.pl, pl12, pl22, 
+          layout = matrix(c(1,1,2,3), 
                           byrow = T, ncol = 2))
 
 dev.off()
+
 
 
 
@@ -819,16 +929,24 @@ df.sp$agg.prob <- log(df.sp$agg.prob)
 world <- ne_countries(continent = 'Europe', returnclass = "sf", scale = 'medium')
 
 # plot
-png('images/figure9.png', width = 480*1.5, height = 480*0.75)
+pdf('images/figure9.pdf', width = 3, height = 3)
 ggplot() +  
   gg(df.sp) +# gg(w.shape2) + 
   geom_sf(data = world, fill=alpha("lightgrey", 0), color="lightgrey") + 
-  xlim(fig.box@bbox[1,]) + 
   ylim(fig.box@bbox[2,]) + 
   scale_fill_viridis(option = 'magma') + 
   labs(fill = "ln(p)") + 
-  theme_classic()
+  theme_classic() +
+  theme(legend.text = element_text(size = 6),
+        legend.title = element_text(size = 8),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) + 
+  scale_x_continuous(breaks = round(seq(fig.box@bbox[1,1],
+                                  fig.box@bbox[1,2],
+                                  length.out = 4),1), 
+                     limits = fig.box@bbox[1,])
 dev.off()
+
 
 
 ####################################################
@@ -892,27 +1010,28 @@ df.p <- rbind(data.frame(alpha = alphas,
 
 df.p$score = factor(df.p$score)
 # plot
-png('images/figure10.png', width = 480*1.5, height = 480*0.75)
+
+
+pdf('images/figure10.pdf', width = 4, height = 3)
 ggplot(df.p, aes(x = alpha, y = scored, 
                  color = score, linetype = score)) + 
-  geom_line(size = 1.5) + 
+  geom_line() + 
   geom_hline(yintercept = 0) + 
   ylim(-1, 0.3) + 
   geom_vline(xintercept = 1, linetype = 2)+
   scale_color_brewer(palette="Dark2") + 
   ylab(bquote("E["*Delta*"]")) +
-  #ylab('E[ \u0394 ]') + 
-  xlab(~gamma)  + 
+  xlab(~omega)  + 
   theme_classic() + 
-  theme(legend.text = element_text(size=15),
-        legend.title = element_blank(),
-        axis.title=element_text(size=15),
-        legend.position = 'bottom',
-        legend.background = element_rect(#fill= 'lightgrey',
-          linetype = "solid",
-          colour = "darkgrey"),
-        legend.key.size = unit(3, 'line')) + 
-  guides(linetype = guide_legend(override.aes = list(size = 2)))
+  theme(legend.position = c(0.82, 0.78),
+        legend.key.width = unit(0.35,"cm"),
+        legend.key.height = unit(0.35,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 6),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) 
+  
 dev.off()
 
 
@@ -1006,32 +1125,46 @@ leg3 <- as_ggplot(cowplot::get_legend(pl.leg3))
 # plot brier
 pl.b3 <- ggplot(Brier.df, aes(x = alpha, y = -score/min(score), 
                               linetype = forecast, color = forecast)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   geom_hline(yintercept = 0) + 
   ylim(-1, 0.5) + 
-  annotate("text", x = 6, y = 0.4, label = '(a)', size = 6)+
   ylab(bquote("E["*Delta*"]")) +
-  xlab(~gamma) + 
+  xlab(~omega) + 
   theme_classic() +
-  theme(legend.position = 'none',
-        axis.title=element_text(size=18),
-        plot.title = element_text(size=18)) +
+  scale_color_discrete(labels = lab.g) +
+  scale_linetype_discrete(labels = lab.g) + 
+  annotate("text", x = 5.9, y = 0.4, label = '(a)', size = 3) +
+  theme(legend.title = element_text(size = 0),
+        legend.position = c(0.78, 0.22),
+        legend.key.width = unit(0.2,"cm"),
+        legend.key.height = unit(0.3,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) + 
   geom_vline(xintercept = 5, linetype = 3) + 
   geom_vline(xintercept = 1, linetype = 3)
 
 
 pl.l3 <- ggplot(Log.df, aes(x = alpha, y = -score/min(score), 
                             linetype = forecast, color = forecast)) +
-  geom_line(size = 1.5)+ 
+  geom_line()+ 
   geom_hline(yintercept = 0) + 
   ylim(-1, 0.5) + 
-  annotate("text", x = 6, y = 0.4, label = '(c)', size = 6)+
   ylab(bquote("E["*Delta*"]")) +
-  xlab(~gamma) +
+  xlab(~omega) +
   theme_classic() +
-  theme(legend.position = 'none',
-        axis.title=element_text(size=18),
-        plot.title = element_text(size=18)) +
+  scale_color_discrete(labels = lab.g) +
+  scale_linetype_discrete(labels = lab.g) + 
+  annotate("text", x = 5.9, y = 0.4, label = '(c)', size = 3) +
+  theme(legend.title = element_text(size = 0),
+        legend.position = c(0.78, 0.22),
+        legend.key.width = unit(0.2,"cm"),
+        legend.key.height = unit(0.3,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) + 
   geom_vline(xintercept = 5, linetype = 3)+ 
   geom_vline(xintercept = 1, linetype = 3)
 
@@ -1039,16 +1172,23 @@ pl.l3 <- ggplot(Log.df, aes(x = alpha, y = -score/min(score),
 
 pl.pg3 <- ggplot(PG.df, aes(x = alpha, y = -score/min(score),
                             linetype = forecast, color = forecast)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   geom_hline(yintercept = 0) + 
   ylim(-1, 0.5) +
-  annotate("text", x = 6, y = 0.4, label = '(b)', size = 6)+
   ylab(bquote("E["*Delta*"]")) +
-  xlab(~gamma) + 
+  xlab(~omega) + 
   theme_classic() +
-  theme(legend.position = 'none',
-        axis.title=element_text(size=18),
-        plot.title = element_text(size=18)) +
+  scale_color_discrete(labels = lab.g) +
+  scale_linetype_discrete(labels = lab.g) + 
+  annotate("text", x = 5.9, y = 0.4, label = '(b)', size = 3) +
+  theme(legend.title = element_text(size = 0),
+        legend.position = c(0.78, 0.22),
+        legend.key.width = unit(0.2,"cm"),
+        legend.key.height = unit(0.3,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) + 
   geom_vline(xintercept = 5, linetype = 3) + 
   geom_vline(xintercept = 1, linetype = 3)
 
@@ -1057,29 +1197,33 @@ pl.pg3 <- ggplot(PG.df, aes(x = alpha, y = -score/min(score),
 
 pl.fg3 <- ggplot(FG.df, aes(x = alpha, y = -score/min(score), 
                             linetype = forecast, color = forecast)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   geom_hline(yintercept = 0) + 
   ylim(-1, 0.5) + 
-  annotate("text", x = 6, y = 0.4, label = '(d)', size = 6)+
   ylab(bquote("E["*Delta*"]")) +
-  xlab(~gamma) + 
+  xlab(~omega) + 
   theme_classic() +
-  theme(legend.position = 'none',
-        axis.title=element_text(size=18),
-        plot.title = element_text(size=18)) +
+  scale_color_discrete(labels = lab.g) +
+  scale_linetype_discrete(labels = lab.g) + 
+  annotate("text", x = 5.9, y = 0.4, label = '(d)', size = 3) +
+  theme(legend.title = element_text(size = 0),
+        legend.position = c(0.78, 0.22),
+        legend.key.width = unit(0.2,"cm"),
+        legend.key.height = unit(0.3,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7)) + 
   geom_vline(xintercept = 5, linetype = 3) + 
   geom_vline(xintercept = 1, linetype = 3)
 
 
-png('images/figure11.png', width = 480*2, height = 480)
-multiplot(pl.b3, pl.pg3, pl.l3, pl.fg3, leg3, 
-          layout = matrix(c(1,1,2,2,
-                            1,1,2,2,
-                            3,3,4,4,
-                            3,3,4,4,
-                            5,5,5,5), byrow = T, ncol = 4))
-dev.off()
 
+pdf('images/figure11.pdf', width = 4, height = 3)
+multiplot(pl.b3, pl.pg3, pl.l3, pl.fg3, 
+          layout = matrix(c(1,2,
+                            3,4), byrow = T, ncol = 2))
+dev.off()
 
 
 ####################################################
@@ -1091,7 +1235,7 @@ pstar = agg.prob
 p1 = pstar
 p0 = 5*pstar
 N = length(pstar)
-alphas <- seq(1e-3, 7, length.out = 100)
+alphas <- seq(1e-5, 7, length.out = 500)
 
 # set number of simulations
 max_loop = 10000
@@ -1156,6 +1300,8 @@ save(Probs.p1, file = 'Probs.p1.csv')
 save(Probs.p2, file = 'Probs.p2.csv')
 save(Probs.np, file = 'Probs.np.csv')
 
+
+
 # load results
 load(file = 'coverage.csv')
 load(file = 'Iscore.csv')
@@ -1179,23 +1325,25 @@ df.pl <- rbind(data.frame(alpha = alphas,
 
 df.pl$score <- factor(df.pl$score, levels = c('Brier', 'Log',
                                               'FG', 'PG'))
-png('images/figure12.png', width = 480*1.5, height = 480*0.75)
+
+pdf('images/figure12.pdf', width = 4, height = 3)
 ggplot(data = df.pl, 
        aes(x = alpha, y = coverage, linetype = score, 
            color = score)) + 
   geom_line() +
+  geom_hline(yintercept = 0.95, color = 'darkgrey') +
   scale_color_brewer(palette="Dark2") +
-  xlab(~gamma)  + 
-  theme_classic() + 
-  theme(legend.text = element_text(size=15),
-        legend.title = element_blank(),
-        axis.title=element_text(size=15),
-        legend.position = 'bottom',
-        legend.background = element_rect(#fill= 'lightgrey',
-          linetype = "solid",
-          colour = "darkgrey"),
-        legend.key.size = unit(3, 'line')) + 
-  guides(linetype = guide_legend(override.aes = list(size = 2)))
+  xlab(~omega) +
+  ylab('coverage probability') +
+  theme_classic() +
+  theme(legend.title = element_text(size = 7),
+        legend.position = c(0.78, 0.22),
+        legend.key.width = unit(0.3,"cm"),
+        legend.key.height = unit(0.3,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 5),
+        axis.title = element_text(size = 7),
+        axis.text = element_text(size = 5))
 dev.off()
 
 
@@ -1215,7 +1363,7 @@ truth.l01 <- mean(log.sc(pstar, p1) - log.sc(pstar, p2))
 #############################################################
 
 # run the simulation and store the results for gamma = 0.001
- sim.na0.001 <- foreach(loop = 1:max_loop, .combine = rbind) %dopar%
+sim.na0.001 <- foreach(loop = 1:max_loop, .combine = rbind) %dopar%
    runn.normapprox(pstar,p1,p2,p0)
 sim.0.001 <- storing(sim.na0.001)
 save(sim.0.001, file = 'sim01.csv')
@@ -1250,38 +1398,71 @@ load('sim15.csv')
 load('sim01.csv')
 load('sim4.csv')
 
+size.let <- 3
 pl01 <- toplot.ddensity(sim.0.001$Brier$Obs,
                         truth.b01, c(-3e-5,7e-5)) + theme_classic() +
-  annotate("text", x = -2.5e-5, y = 0.9, label = '(a)', size = 6) 
+  annotate("text", x = -2.2e-5, y = 0.9, label = '(a)', 
+           size = size.let) +
+  annotate("text", x = 5e-5, y = 0.9, label = TeX('$\\omega = 0.001$'), 
+           size = size.let - 1, color = 'blue') +
+  theme(axis.title = element_text(size = 5),
+        axis.text = element_text(size = 4))
+  
 
 
 pl15 <- toplot.ddensity(sim.15$Brier$Obs,
                         truth.b15, c(-4e-5,5e-5)) + theme_classic() + 
-  annotate("text", x = -2.5e-5, y = 0.9, label = '(b)', size = 6) 
-  
+  annotate("text", x = -2.7e-5, y = 0.9, label = '(b)', 
+           size = size.let) +
+  annotate("text", x = 4e-5, y = 0.9, label = TeX('$\\omega = 1.5$'), 
+           size = size.let - 1, color = 'blue') +
+  theme(axis.title = element_text(size = 5),
+        axis.text = element_text(size = 4))
+
 pl4 <- toplot.ddensity(sim.4$Brier$Obs,
                        truth.b4, c(-1.2e-4,1.5e-4)) + theme_classic()+ 
-  annotate("text", x = -1e-4, y = 0.9, label = '(c)', size = 6) 
+  annotate("text", x = -1e-4, y = 0.9, label = '(c)', 
+           size = size.let) + 
+  annotate("text", x = 1.3e-4, y = 0.9, label = TeX('$\\omega = 4$'), 
+                                    size = size.let - 1, color = 'blue') +
+  theme(axis.title = element_text(size = 5),
+        axis.text = element_text(size = 4))
 
 
 pl01.l <- toplot.ddensity(sim.0.001$Log$Obs,
                           truth.l01, c(-1e-3,1e-2)) + theme_classic() + 
-  annotate("text", x = 0, y = 0.9, label = '(d)', size = 6) 
+  annotate("text", x = 0, y = 0.9, label = '(d)', 
+           size = size.let) + 
+  annotate("text", x = 0.008, y = 0.9, label = TeX('$\\omega = 0.001$'), 
+           size = size.let - 1, color = 'blue') +
+  theme(axis.title = element_text(size = 5),
+        axis.text = element_text(size = 4))
 
 
 pl15.l <- toplot.ddensity(sim.15$Log$Obs,
                           truth.l15, c(-1e-3,1e-3)) + theme_classic() + 
-  annotate("text", x = -0.9e-3, y = 0.9, label = '(e)', size = 6) 
+  annotate("text", x = -0.7e-3, y = 0.9, label = '(e)',
+           size = size.let)+ 
+  annotate("text", x = 0.0008, y = 0.9, label = TeX('$\\omega = 1.5$'), 
+           size = size.let - 1, color = 'blue') +
+  theme(axis.title = element_text(size = 5),
+        axis.text = element_text(size = 4))
 
 
 pl4.l <- toplot.ddensity(sim.4$Log$Obs,
                          truth.l4, c(-1e-3,0.3e-2)) + theme_classic() + 
-  annotate("text", x = -0.9e-3, y = 0.9, label = '(f)', size = 6) 
+  annotate("text", x = -0.6e-3, y = 0.9, label = '(f)', 
+           size = size.let) + 
+  annotate("text", x = 0.0025, y = 0.9, label = TeX('$\\omega = 4$'), 
+           size = size.let - 1, color = 'blue') +
+  theme(axis.title = element_text(size = 5),
+        axis.text = element_text(size = 4))
 
-png('images/figure13.png', width = 480*2, height = 480)
+pdf('images/figure13.pdf', width = 4, height = 3)
 multiplot(pl01, pl15, pl4, pl01.l, pl15.l, pl4.l, 
           layout = matrix(1:6, byrow = T, ncol = 3))
 dev.off()
+
 
 ####################################################
 ################ FIGURE 14 #########################
@@ -1313,53 +1494,62 @@ df.fg.pref <- rbind(data.frame(prob = Probs.np[,4], pref = 'no pref',
 # plot them
 pl.prob.l <- ggplot(df.log.pref, aes(x = alpha, y = prob, 
                                      linetype = pref, color = pref)) + 
-  annotate("text", x = 0.1, y = 0.9, label = '(a)', size = 6) +
-  geom_line(size = 1.5) + 
-  xlab(~gamma) + 
+  annotate("text", x = 5.9, y = 0.5, label = '(a)', size = 3) +
+  geom_line() + 
+  xlab(~omega)+
+  ylab('Pr') +
   labs(color = 'Preferences',
        linetype = 'Preferences') + 
   theme_classic() + 
-  theme(legend.background = element_rect(#fill= 'lightgrey',
-    linetype="solid", 
-    colour ="darkgrey"),
-    legend.key.size = unit(1, 'line'),
-    legend.text = element_text(size = 12),
-    text = element_text(size=16)) 
+  theme(#legend.position = c(0.7, 0.7), 
+        legend.title = element_text(size = 6),
+        legend.key.width = unit(0.3,"cm"),
+        legend.key.height = unit(0.3,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 5),
+        axis.text = element_text(size = 5),
+        axis.title = element_text(size = 7))
 
 
 pl.prob.pg <- ggplot(df.pg.pref, aes(x = alpha, y = prob,
                                      linetype = pref, color = pref)) + 
-  geom_line(size = 1.5) + 
-  annotate("text", x = 0.1, y = 0.9, label = '(b)', size = 6) +
-  xlab(~gamma)+ 
+  geom_line() + 
+  annotate("text", x = 5.9, y = 0.5, label = '(b)', size = 3) +
+  xlab(~omega)+
+  ylab('Pr') +
   labs(color = 'Preferences',
        linetype = 'Preferences') + 
   theme_classic() + 
-  theme(legend.background = element_rect(#fill= 'lightgrey',
-    linetype="solid", 
-    colour ="darkgrey"),
-    legend.key.size = unit(1, 'line'),
-    legend.text= element_text(size = 12),
-    text = element_text(size=16))  
+  theme(#legend.position = c(0.7, 0.7), 
+    legend.title = element_text(size = 6),
+    legend.key.width = unit(0.3,"cm"),
+    legend.key.height = unit(0.3,"cm"),
+    legend.background = element_rect(colour ="darkgrey"),
+    legend.text = element_text(size = 5),
+    axis.text = element_text(size = 5),
+    axis.title = element_text(size = 7))
 
 
 pl.prob.fg <- ggplot(df.fg.pref, aes(x = alpha, y = prob,
                                      linetype = pref, color = pref)) + 
-  geom_line(size = 1.5) + 
-  annotate("text", x = 0.1, y = 0.9, label = '(c)', size = 6) +
-  xlab(~gamma)+ 
+  geom_line() + 
+  annotate("text", x = 5.9, y = 0.5, label = '(c)', size = 3) +
+  xlab(~omega)+
+  ylab('Pr') + 
   labs(color = 'Preferences',
        linetype = 'Preferences') +
   theme_classic() + 
-  theme(legend.background = element_rect(#fill= 'lightgrey',
-    linetype="solid", 
-    colour ="darkgrey"),
-    legend.key.size = unit(1, 'line'),
-    legend.text= element_text(size = 12),
-    text = element_text(size=16))  
+  theme(#legend.position = c(0.7, 0.7), 
+    legend.title = element_text(size = 6),
+    legend.key.width = unit(0.3,"cm"),
+    legend.key.height = unit(0.3,"cm"),
+    legend.background = element_rect(colour ="darkgrey"),
+    legend.text = element_text(size = 5),
+    axis.text = element_text(size = 5),
+    axis.title = element_text(size = 7))
 
 
-png('images/figure14.png', width = 480*2, height = 480)
+pdf('images/figure14.pdf', width = 4, height = 3)
 multiplot(pl.prob.l, pl.prob.pg, pl.prob.fg)
 dev.off()
 
@@ -1460,7 +1650,8 @@ df.num.260 <- rbind(data.frame(x = NN1.260, model = 'model 1'),
                     data.frame(x = NN3.260, model = 'model 3'))
 
 # legend plot
-plot.leg.d <- ggplot(df.num.104, aes(x = x, linetype = model, color = model)) +
+plot.leg.d <- ggplot(df.num.104, aes(x = x, linetype = model, 
+                                     color = model)) +
   stat_density(geom = 'line') + 
   labs(color = 'Model', linetype = 'Model') + 
   theme(legend.text=element_text(size=18),
@@ -1476,30 +1667,46 @@ plot.leg.d <- ggplot(df.num.104, aes(x = x, linetype = model, color = model)) +
 leg.d <- as_ggplot(cowplot::get_legend(plot.leg.d))
 
 
-plot.104 <- ggplot(df.num.104, aes(x = x, color = model, linetype = model)) +
-  geom_density(size = 1.5)  +
+hist(df.num.104$x[df.num.104$model == 'model 3'], 
+     breaks = 300)
+df.num.104$model <- as.factor(df.num.104$model)
+
+plot.104 <- ggplot(df.num.104, aes(x = x,
+                                   y = ..scaled.. ,
+                                   colour = model, 
+                                   linetype = model)) +
+  stat_density(geom = 'line', position = 'identity') +
   xlim(0,350) + 
+  ylim(0,1.05) +
   xlab('Number of events') + 
   ylab('Empirical Density') +
   theme_classic() + 
-  theme(legend.position = 'none',
-        text = element_text(size = 12))
+  annotate("text", x = 300, y = 0.2, label = '(a)', size = 4) +
+  theme(legend.position = c(0.8, 0.8), 
+    legend.title = element_text(size = 0),
+    legend.key.width = unit(0.4,"cm"),
+    legend.key.height = unit(0.4,"cm"),
+    legend.background = element_rect(colour ="darkgrey"),
+    legend.text = element_text(size = 5)) 
 
-plot.260 <- ggplot(df.num.260, aes(x = x, color = model, linetype = model)) +
-  geom_density(size = 1.5)  +
+plot.260 <- ggplot(df.num.260, aes(x = x, y = ..scaled.., 
+                                   color = model, linetype = model)) +
+  stat_density(geom = 'line', position = 'identity') +
   xlim(0,350) + 
+  ylim(0,1.05) +
   xlab('Number of events') + 
   ylab('Empirical Density') + 
   theme_classic() + 
-  theme(legend.position = 'none',
-        text = element_text(size = 12))
+  annotate("text", x = 300, y = 0.2, label = '(b)', size = 4) +
+  theme(legend.position = c(0.8, 0.8), 
+        legend.title = element_text(size = 0),
+        legend.key.width = unit(0.4,"cm"),
+        legend.key.height = unit(0.4,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 5)) 
 
-png('images/figure15.png', width = 480*2, height = 480)
-multiplot(plot.104, plot.260, leg.d, layout = matrix(c(1,1,2,2,
-                                                       1,1,2,2,
-                                                       1,1,2,2,
-                                                       3,3,3,3), byrow = T, ncol = 4))
-
+pdf('images/figure15.pdf', width = 4, height = 3)
+multiplot(plot.104, plot.260, cols = 2)
 dev.off()
 
 #######################################################
@@ -1561,9 +1768,9 @@ dev.off()
 # the code is exactly the same, it changes the TL argument
 
 # set number of bins vector
-N.vec <- c(seq(10,200, by = 10), as.integer(seq(219, 500, by = 20)))
+N.vec <- c(seq(10,200, by = 5), as.integer(seq(219, 500, by = 10)))
 
-TL = 52*5
+TL = 52*2
 
 res12.100 <- mclapply(N.vec, function(x) extract.probs(
   runner.probs(x, sim1, sim2, opt = 1, Tlim = TL)), mc.cores = 5)
@@ -1658,28 +1865,26 @@ df.2vs3.100.fg <- rbind(data.frame(x = N.vec, y = pp23.100.fg, truth = 'p2'),
 pl.leg.1vs2 <- ggplot(df.1vs2.100.l, aes(x = x, y = y, color = truth, linetype = truth)) +
   geom_line() +
   labs(color = 'Data generating model', linetype = 'Data generating model') + 
-  theme(legend.text=element_text(size=18),
-        legend.title = element_blank(),
-        legend.position = 'right',
-        legend.background = element_rect(#fill= 'lightgrey',
-          linetype = "solid",
-          colour = "darkgrey"),
-        legend.key.size = unit(2, 'line'))+ 
-  guides(linetype = guide_legend(override.aes = list(size = 2)))
+  theme_classic() +
+  theme(#legend.position = c(0.8, 0.8), 
+        legend.title = element_text(size = 0),
+        legend.key.width = unit(0.4,"cm"),
+        legend.key.height = unit(0.4,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 5)) 
 
 leg.1vs2 <- as_ggplot(cowplot::get_legend(pl.leg.1vs2))
 
 pl.leg.1vs3 <- ggplot(df.1vs3.100.l, aes(x = x, y = y, color = truth, linetype = truth)) +
   geom_line() +
   labs(color = 'Data generating model', linetype = 'Data generating model') + 
-  theme(legend.text=element_text(size=18),
-        legend.title = element_blank(),
-        legend.position = 'right',
-        legend.background = element_rect(#fill= 'lightgrey',
-          linetype = "solid",
-          colour = "darkgrey"),
-        legend.key.size = unit(2, 'line'))+ 
-  guides(linetype = guide_legend(override.aes = list(size = 2)))
+  theme_classic() +
+  theme(#legend.position = c(0.8, 0.8), 
+    legend.title = element_text(size = 0),
+    legend.key.width = unit(0.4,"cm"),
+    legend.key.height = unit(0.4,"cm"),
+    legend.background = element_rect(colour ="darkgrey"),
+    legend.text = element_text(size = 5)) 
 
 leg.1vs3 <- as_ggplot(cowplot::get_legend(pl.leg.1vs3))
 
@@ -1687,14 +1892,13 @@ leg.1vs3 <- as_ggplot(cowplot::get_legend(pl.leg.1vs3))
 pl.leg.2vs3 <- ggplot(df.2vs3.100.l, aes(x = x, y = y, color = truth, linetype = truth)) +
   geom_line() +
   labs(color = 'Data generating model', linetype = 'Data generating model') + 
-  theme(legend.text=element_text(size=18),
-        legend.title = element_blank(),
-        legend.position = 'right',
-        legend.background = element_rect(#fill= 'lightgrey',
-          linetype = "solid",
-          colour = "darkgrey"),
-        legend.key.size = unit(2, 'line'))+ 
-  guides(linetype = guide_legend(override.aes = list(size = 2)))
+  theme_classic() +
+  theme(#legend.position = c(0.8, 0.8), 
+    legend.title = element_text(size = 0),
+    legend.key.width = unit(0.4,"cm"),
+    legend.key.height = unit(0.4,"cm"),
+    legend.background = element_rect(colour ="darkgrey"),
+    legend.text = element_text(size = 5)) 
 
 leg.2vs3 <- as_ggplot(cowplot::get_legend(pl.leg.2vs3))
 
@@ -1703,103 +1907,140 @@ leg.2vs3 <- as_ggplot(cowplot::get_legend(pl.leg.2vs3))
 
 plot.1vs2.100.l.prob <- 
   ggplot(df.1vs2.100.l, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) +
+  geom_line() +
   ylim(0,1) +
-  annotate("text", x = 450, y = 0.1, label = '(a)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(a)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none') + 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5)) + 
   xlab('N') + 
-  ylab('Prob') 
+  ylab(~beta) + 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
 
+df.1vs2.100.pg <- df.1vs2.100.pg[!is.na(df.1vs2.100.pg$y),]
 plot.1vs2.100.pg.prob <- 
   ggplot(df.1vs2.100.pg, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) +
+  geom_line() +
   ylim(0,1) + 
-  annotate("text", x = 30, y = 0.9, label = '(b)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(b)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none')+ 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5))+ 
   xlab('N') + 
-  ylab('Prob')
+  ylab(~beta)+ 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 
 plot.1vs2.100.fg.prob <- 
   ggplot(df.1vs2.100.fg, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   ylim(0,1) + 
-  annotate("text", x = 450, y = 0.1, label = '(c)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(c)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none')+ 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5))+ 
   xlab('N') + 
-  ylab('Prob')
+  ylab(~beta)+ 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 
 # model 1 against model 3
 
 plot.1vs3.100.l.prob <- 
   ggplot(df.1vs3.100.l, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   ylim(0,1) + 
-  annotate("text", x = 30, y = 0.9, label = '(d)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(d)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none') + 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5)) + 
   xlab('N') + 
-  ylab('Prob') 
+  ylab(~beta) + 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
 
+df.1vs3.100.pg <- df.1vs3.100.pg[!is.na(df.1vs3.100.pg$y),]
 plot.1vs3.100.pg.prob <- 
   ggplot(df.1vs3.100.pg, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) +
+  geom_line() +
   ylim(0,1) + 
-  annotate("text", x = 30, y = 0.9, label = '(e)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(e)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none')+ 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5))+ 
   xlab('N') + 
-  ylab('Prob')
+  ylab(~beta)+ 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 
 plot.1vs3.100.fg.prob <- 
   ggplot(df.1vs3.100.fg, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   ylim(0,1) + 
-  annotate("text", x = 30, y = 0.9, label = '(f)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(f)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none')+ 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5))+ 
   xlab('N') + 
-  ylab('Prob')
+  ylab(~beta) + 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 
 
 # model 2 against model 3
 
 plot.2vs3.100.l.prob <- 
   ggplot(df.2vs3.100.l, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   ylim(0,1) + 
-  annotate("text", x = 450, y = 0.1, label = '(g)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(g)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none') + 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5)) + 
   xlab('N') + 
-  ylab('Prob') 
+  ylab(~beta)+ 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
 
 
+df.2vs3.100.pg <- df.2vs3.100.pg[!is.na(df.2vs3.100.pg$y),]
 plot.2vs3.100.pg.prob <- 
   ggplot(df.2vs3.100.pg, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   ylim(0,1) + 
-  annotate("text", x = 30, y = 0.9, label = '(h)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(h)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none')+ 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5))+ 
   xlab('N') + 
-  ylab('Prob')
+  ylab(~beta)+ 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE))
+
 
 plot.2vs3.100.fg.prob <- 
   ggplot(df.2vs3.100.fg, aes(x = x, y = y, color = truth, linetype = truth)) +
-  geom_line(size = 1.5) + 
+  geom_line() + 
   ylim(0,1) + 
-  annotate("text", x = 450, y = 0.1, label = '(i)', size = 6) +
+  annotate("text", x = 450, y = 0.5, label = '(i)', size = 3) +
   theme_classic() + 
-  theme(legend.position = 'none') + 
+  theme(legend.position = 'none',
+        axis.text=element_text(size = 4),
+        axis.title = element_text(size = 5)) + 
   xlab('N') + 
-  ylab('Prob')
+  ylab(~beta) + 
+  scale_x_continuous(guide = guide_axis(check.overlap = TRUE)) 
+  
 
-png('images/figure17.png', width = 480*2, height = 480)
+
+pdf('images/figure16.pdf', width = 4, height = 4)
 multiplot(plot.1vs2.100.l.prob, plot.1vs2.100.pg.prob, plot.1vs2.100.fg.prob, leg.1vs2,
           plot.1vs3.100.l.prob, plot.1vs3.100.pg.prob, plot.1vs3.100.fg.prob, leg.1vs3,
           plot.2vs3.100.l.prob, plot.2vs3.100.pg.prob, plot.2vs3.100.fg.prob, leg.2vs3,
@@ -1807,7 +2048,6 @@ multiplot(plot.1vs2.100.l.prob, plot.1vs2.100.pg.prob, plot.1vs2.100.fg.prob, le
                             5,5,6,6,7,7,8,
                             9,9,10,10,11,11,12), byrow = T, nrow = 3))
 dev.off()
-
 
 ###################################################
 ############ FIGURE 17 slides #####################
@@ -1827,7 +2067,8 @@ plot.1vs2.200.l.prob <-
 
 
 plot.1vs2.200.pg.prob <- 
-  ggplot(df.1vs2.100.pg, aes(x = x, y = y, color = truth, linetype = truth)) +
+  ggplot(df.1vs2.100.pg[
+    !is.na(df.1vs2.100.pg$y),], aes(x = x, y = y, color = truth, linetype = truth)) +
   geom_line(size = 1.5) +
   ylim(0,1) + 
   theme_classic() + 
@@ -1835,7 +2076,7 @@ plot.1vs2.200.pg.prob <-
   xlab('N') + 
   ylab('Prob')
 
-plot.1vs2.100.fg.prob <- 
+plot.1vs2.200.fg.prob <- 
   ggplot(df.1vs2.100.fg, aes(x = x, y = y, color = truth, linetype = truth)) +
   geom_line(size = 1.5) + 
   ylim(0,1) + 
@@ -1878,7 +2119,7 @@ plot.1vs3.200.fg.prob2 <-
 
 png('images/figure17_slid.png', width = 480*2, height = 480)
 multiplot(plot.1vs2.100.l.prob2, plot.1vs2.100.pg.prob2, plot.1vs2.100.fg.prob2, leg.1vs2,
-          plot.1vs2.200.l.prob2, plot.1vs2.200.pg.prob2, plot.1vs2.200.fg.prob2, leg.1vs2,
+          plot.1vs2.200.l.prob2, plot.1vs2.200.pg.prob, plot.1vs2.200.fg.prob2, leg.1vs2,
           layout = matrix(c(1,1,2,2,3,3,4,
                             5,5,6,6,7,7,8), byrow = T, nrow = 2))
 dev.off()
@@ -1931,21 +2172,29 @@ leg.pref <- as_ggplot(cowplot::get_legend(pl.leg.pref))
 
 plot.pref.l <- ggplot(df.l, aes(x = N, y  = p, color = pref, linetype = pref)) + 
   geom_line() + 
-  theme_classic() + 
-  theme(legend.position = 'none')
+  theme_classic() +
+  theme(legend.position = c(0.8, 0.6), 
+    legend.title = element_text(size = 0),
+    legend.key.width = unit(0.4,"cm"),
+    legend.key.height = unit(0.4,"cm"),
+    legend.background = element_rect(colour ="darkgrey"),
+    legend.text = element_text(size = 6)) +
+  ylab('Probs')
 
 
 plot.pref.fg <- ggplot(df.fg, aes(x = N, y  = p, color = pref, linetype = pref)) + 
   geom_line() + 
-  theme_classic() + 
-  theme(legend.position = 'none')
+  theme_classic() +
+  theme(legend.position = c(0.8, 0.6), 
+        legend.title = element_text(size = 0),
+        legend.key.width = unit(0.4,"cm"),
+        legend.key.height = unit(0.4,"cm"),
+        legend.background = element_rect(colour ="darkgrey"),
+        legend.text = element_text(size = 6)) +
+  ylab('Probs')
 
-png('images/figure18.png', width = 480*2, height = 480)
-multiplot(plot.pref.l, plot.pref.fg, leg.pref, 
-          layout = matrix(c(1,1,2,2,
-                            1,1,2,2,
-                            1,1,2,2,
-                            3,3,3,3), byrow = T, ncol = 4))
+pdf('images/figure18.pdf', width = 4, height = 3)
+multiplot(plot.pref.l, plot.pref.fg, cols = 2)
 
 dev.off()
 

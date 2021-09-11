@@ -1,0 +1,465 @@
+---
+title: "Etas_approximations"
+author: "Francesco Serafini"
+date: "06/07/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\newcommand{\THETA}{\boldsymbol \theta}
+
+# Temporal ETAS model
+
+Here, we investigate various methodology to approximate a temporal ETAS model. A temporal ETAS model is a marked point process model, specifically an Hawkes process, with conditional intesity given by:
+
+$$
+\lambda(t)|\mathcal H_t = \mu + K \sum_{i: t_i < t} \exp(\alpha(m_i - M_0))\frac{1}{(t - t_i + c)^p}
+$$
+
+where $\mathcal H_t = \{(t_i, m_i)\}$ is the history of the process. The model, as we 
+present it, has 5 parameters $\mu, K, \alpha, c, p$ which have to be non-negative, except 
+for $p$ which has to be greater than $1$. 
+
+To be free from any constraint we are going to consider a different parametrization, 
+specifically $\mu = \exp \theta_1$, $K = \exp \theta_2$, $\alpha = \exp \theta_3$, $c = \exp \theta_4$, $p - 1 = \exp \theta_5$. Now the parameters $\theta_i$ are free from any constraint. The conditional intensity that we are going to consider is
+
+$$
+\lambda(t)|\mathcal H_t = \exp(\theta_1) + \exp(\theta_2)\sum_{i : t_i < t} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big)\frac{1}{(t - t_i + \exp\theta_4)^{1 + \exp\theta_5}}
+$$
+Parametrized in this way, the conditional intensity is an increasing function of $\theta_1, \theta_2, \theta_3$, and a decreasing function of $\theta_4, \theta_5$. 
+
+The expected number of points in $(T_1, T_2)$ by the model is given by:
+
+$$
+\begin{aligned}
+\Lambda(T_1, T_2) & = \int_{T_1}^{T_2} \lambda(t)dt = \int_{T_1}^{T_2} \left( \exp(\theta_1) + \exp(\theta_2)\sum_{i : t_i < t} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big)\frac{1}{(t - t_i + \exp\theta_4)^{1 + \exp\theta_5}} \right) dt\\ \\ 
+& = \exp(\theta_1)(T_2 - T_1) + \exp(\theta_2)  \int_{T_1}^{T_2} \sum_{i: t_i \in \mathcal H_t} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big)  \frac{1}{(t - t_i + \exp\theta_4)^{1 + \exp\theta_5}}\mathbb I(t_i < t) dt \\ \\ 
+& = \exp(\theta_1)(T_2 - T_1) + \exp(\theta_2) \Big( \sum_{i: t_i < T_1} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big)  \int_{T_1}^{T_2}\frac{1}{(t - t_i + \exp\theta_4)^{1 + \exp\theta_5}}\mathbb I(t_i < t) dt + \\ \\  
+& \quad \quad \sum_{i: t_i \geq T_1} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big) \int_{T_1}^{T_2} \frac{1}{(t - t_i + \exp\theta_4)^{1 + \exp\theta_5}}\mathbb I(t_i < t) dt \Big) 
+\end{aligned}
+$$
+
+
+Where, assuming $T_1 > t_i$
+
+$$
+\begin{aligned}
+\int_{T_1}^{T_2} (t - t_i + \exp\theta_4)^{ - 1 - \exp\theta_5} dt & = - \frac{(t - t_i + \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} \Bigg \vert_{T_1}^{T_2} \\ \\ 
+& = \frac{(T_1 - t_i + \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} - \frac{(T_2 - t_i + \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} 
+\end{aligned}
+$$
+
+While 
+
+$$
+\int_{t_i}^{T_2} (t - t_i + \exp\theta_4)^{ - 1 - \exp\theta_5} dt  = \frac{ \exp(\theta_4)^{-\exp\theta_5} }{\exp\theta_5} - \frac{(T_2 - t_i + \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5}
+$$
+
+Which leads to 
+
+$$
+\begin{aligned}
+\Lambda(T_1, T_2) & = \int_{T_1}^{T_2} \lambda(t)dt = \\ \\ 
+& = \exp(\theta_1)(T_2 - T_1) + \exp(\theta_2) \Bigg( \sum_{i: t_i < T_1} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big) \Big( \frac{(T_1 - t_i + \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} - \\ \\ 
+& \quad \quad \frac{(T_2 - t_i + \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} \Big) +  
+\sum_{i: t_i \geq T_1} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big) \Big( \frac{( \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} - \\ \\ 
+& \quad \quad \frac{(T_2 - t_i + \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} \Big) \Bigg)\\ \\ 
+\end{aligned}
+$$
+
+This is the intensity and the expected number of points of the process without considering the marks. The effect of the mark is cosidered only inside the triggering function.
+
+The expression of the number of points seen above is the most general case for which we are interested in the expected number of points in an interval which has observations inside it and before it. The first summation is the contribution to the expected number of points given by the \emph{past} (observations s.t. $t_i < T_1$) while the second summation is the contribution given by the \emph{present} (observations $t_i > T_1$). In practice, these cases rarely happears together. Indeed, if we are interested in the likelihood of the model then $T_1 < t_i$ and we have only the second summation. If we are intersted in predicting the future given the past then $T_1 > t_i$ and we have only the first summation.
+
+We have than if $T_1 > t_i$ for any $t_i \in \mathcal H_t$ 
+
+$$
+\Lambda(T_1, T_2) = \exp(\theta_1)(T_2 - T_1) + \exp(\theta_2) \sum_{i: t_i \in \mathcal H_t} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big) \Big( \frac{(T_1 - t_i + \exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} -
+ \frac{(T_2 - t_i + \exp\theta_4)^{-\exp\theta_5}}{\exp\theta_5} \Big)
+$$
+
+If $t_i \geq T_1$ for any $t_i \in \mathcal H_t$ 
+
+$$
+\Lambda(T_1, T_2) = \exp(\theta_1)(T_2 - T_1) + \exp(\theta_2) \sum_{i: t_i \in \mathcal H_t} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big) \Big( \frac{(\exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} - \frac{(T_2 - t_i + \exp\theta_4)^{-\exp\theta_5}}{\exp\theta_5} \Big)
+$$
+
+From here we can see that, in the last case, the expected number of points is an increasing function of $\theta_1, \theta_2, \theta_3$ because $m_i - M_0 \geq 0$, and a decreasing function of $\theta_4, \theta_5$.
+
+
+Given a set of $N$ observations $\mathcal H_t = \{(t_i, m_i), i = 1,...,N\}$ such that $t_i \in [T_1,T_2]$ for any $i = 1,...,N$ the likelihood of the model is given by:
+
+$$
+\begin{aligned}
+\mathcal L(\THETA) & = -\Lambda(T_1, T_2) + \sum_{i = 1}^N \log \lambda(t_i) \\ \\ 
+& = - \Bigg( \exp(\theta_1)(T_2 - T_1) + \exp(\theta_2) \sum_{i: t_i \in \mathcal H_t} \exp\Big(\exp(\theta_3)(m_i - M_0)\Big) \Big( \frac{(\exp\theta_4)^{-\exp\theta_5} }{\exp\theta_5} - \frac{(T_2 - t_i + \exp\theta_4)^{-\exp\theta_5}}{\exp\theta_5} \Big)\Bigg) + \\ \\ 
+& \quad \quad \sum_{i=1}^N \log\Big( \exp(\theta_1) + \exp(\theta_2)\sum_{j : t_j < t_i} \exp\Big(\exp(\theta_3)(m_j - M_0)\Big)\frac{1}{(t_i - t_j + \exp\theta_4)^{1 + \exp\theta_5}} \Big)
+\end{aligned}
+$$
+
+
+```{r}
+source('ETAS_utils.R')
+t.parms <- log(c(10, 0.8*(0.01^0.5)*0.5, 0.2, 0.01, 0.5))
+Tlim = 10
+# ss2 <- sample.ETAS.unnorm(t.parms, beta.par = 2.3, M0 = 2.5, Tlim)
+# save(ss2, file = 'sample.etas.RData')
+
+load('sample.etas.RData')
+toplot.cumcounts(Tlim, t.parms, ss2, M0 = 2.5, by.s = 0.2)
+
+t.breaks <- seq(0, Tlim, by = 0.1)
+hh <- hist(ss2$ts, breaks = t.breaks, plot = FALSE)
+ll <- log.lambda.ETAS(hh$mids, t.parms, ss2, M0 = 2.5)
+
+plot(hh)
+lines(hh$mids, exp(ll)*0.1)
+
+```
+
+
+
+```{r}
+ML.optim <- optim(c(0,0,0,0,0), ETAS.log.lik.toptim, Ht = ss2, M0 = 2.5, Tlim = 10)
+
+rbind(ML = exp(ML.optim$par), True = exp(t.parms))
+
+pl.cs.ML <- toplot.cumcounts(10, ML.optim$par, ss2, 2.5, 0.1) + labs(title = 'Max Lik') +
+  ylim(0,550)
+pl.cs.true <- toplot.cumcounts(10, t.parms, ss2, 2.5, 0.1) + labs(title = 'True') +
+  ylim(0,550)
+multiplot(pl.cs.true, pl.cs.ML, cols = 2)
+```
+
+
+```{r}
+# univariate likelihood analysis
+toplot.univ.comp <- function(par.values, par.idx, par.name,
+                             theta.par, ML.est, Ht, M0, Tlim){
+  
+  
+  theta.m.true <- cbind(rep(t.parms[1], length(par.values)),
+                        rep(t.parms[2], length(par.values)),
+                        rep(t.parms[3], length(par.values)),
+                        rep(t.parms[4], length(par.values)),
+                        rep(t.parms[5], length(par.values)))
+  
+  theta.m.ML <- cbind(rep(ML.est[1], length(par.values)),
+                      rep(ML.est[2], length(par.values)),
+                      rep(ML.est[3], length(par.values)),
+                      rep(ML.est[4], length(par.values)),
+                      rep(ML.est[5], length(par.values)))
+  
+  theta.m.true[,par.idx] <- par.values
+  theta.m.ML[,par.idx] <- par.values
+  
+  LL.true <- sapply(1:nrow(theta.m.true), function(i) 
+    ETAS.log.lik(theta.m.true[i,], Ht, M0, Tlim))
+  
+  LL.ML <- sapply(1:nrow(theta.m.ML), function(i) 
+    ETAS.log.lik(theta.m.ML[i,], Ht, M0, Tlim))
+  
+  ll.lim <- range(c(LL.true, LL.ML))
+  
+  df <- rbind(data.frame(x = par.values, 
+                         y = LL.ML, 
+                         typ = 'ml'),
+              data.frame(x = par.values, 
+                         y = LL.true, 
+                         typ = 'true'))
+  list(pl.true = ggplot(data.frame(x = par.values,
+                                   y = LL.true), aes(x = x, y = y)) +
+         geom_line() +
+         geom_vline(xintercept = ML.est[par.idx], linetype = 2) +
+         labs(title = 'true params') +
+         ylab('log-lik') +
+         xlab(par.name) +
+         ylim(ll.lim),
+       pl.ML = ggplot(data.frame(x = par.values,
+                                   y = LL.ML), aes(x = x, y = y)) +
+         geom_line() +
+         geom_vline(xintercept = ML.est[par.idx], linetype = 2)+
+         labs(title = 'ML est')+
+         ylab('log-lik') +
+         xlab(par.name) +
+         ylim(ll.lim),
+       df = df)
+
+}
+```
+
+
+```{r}
+const <- 3
+theta1.v <- seq(ML.optim$par[1] - const, 
+                ML.optim$par[1] + const,length.out = 100)
+plotl.th1 <- toplot.univ.comp(theta1.v, 1, 'theta1', t.parms, ML.optim$par,
+                          ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotl.th1, cols = 2)
+```
+
+
+```{r}
+# theta2
+const <- 3
+theta2.v <- seq(ML.optim$par[2] - const, 
+                ML.optim$par[2] + const,length.out = 100)
+plotl.th2 <- toplot.univ.comp(theta2.v, 2, 'theta2', t.parms, ML.optim$par,
+                          ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotl.th2, cols = 2)
+```
+
+
+```{r}
+# theta3
+const <- 3
+theta3.v <- seq(ML.optim$par[3] - const, 
+                ML.optim$par[3] + const,length.out = 100)
+plotl.th3 <- toplot.univ.comp(theta3.v, 3, 'theta3', t.parms, ML.optim$par,
+                          ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotl.th3, cols = 2)
+```
+
+
+```{r}
+# theta4
+const <- 4
+theta4.v <- seq(ML.optim$par[4] - const, 
+                ML.optim$par[4] + const,length.out = 100)
+plotl.th4 <- toplot.univ.comp(theta4.v, 4, 'theta4', t.parms, ML.optim$par,
+                          ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotl.th4, cols = 2)
+```
+
+
+```{r}
+# theta5
+const <- 4
+theta5.v <- seq(ML.optim$par[5] - const, 
+                ML.optim$par[5] + const,length.out = 100)
+plotl.th5 <- toplot.univ.comp(theta5.v, 5, 'theta5', t.parms, ML.optim$par,
+                          ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotl.th5, cols = 2)
+```
+
+
+
+```{r}
+
+# univariate likelihood analysis
+toplot.loglambda.comp <- function(par.values, par.idx, par.name,
+                             theta.par, ML.est, Ht, M0, Tlim, tt = 5){
+  
+  
+  theta.m.true <- cbind(rep(t.parms[1], length(par.values)),
+                        rep(t.parms[2], length(par.values)),
+                        rep(t.parms[3], length(par.values)),
+                        rep(t.parms[4], length(par.values)),
+                        rep(t.parms[5], length(par.values)))
+  
+  theta.m.ML <- cbind(rep(ML.est[1], length(par.values)),
+                      rep(ML.est[2], length(par.values)),
+                      rep(ML.est[3], length(par.values)),
+                      rep(ML.est[4], length(par.values)),
+                      rep(ML.est[5], length(par.values)))
+  
+  theta.m.true[,par.idx] <- par.values
+  theta.m.ML[,par.idx] <- par.values
+  
+  LL.true <- sapply(1:nrow(theta.m.true), function(i) 
+    log.lambda.ETAS.single(tt, theta.m.true[i,], Ht, M0))
+  
+  LL.ML <- sapply(1:nrow(theta.m.ML), function(i) 
+    log.lambda.ETAS.single(tt, theta.m.ML[i,], Ht, M0))
+  
+  ll.lim <- range(c(LL.true, LL.ML))
+  
+  df <- rbind(data.frame(x = par.values, 
+                         y = LL.ML, 
+                         typ = 'ml'),
+              data.frame(x = par.values, 
+                         y = LL.true, 
+                         typ = 'true'))
+  
+  list(pl.true = ggplot(data.frame(x = par.values,
+                                   y = LL.true), aes(x = x, y = y)) +
+         geom_line() +
+         geom_vline(xintercept = ML.est[par.idx], linetype = 2) +
+         labs(title = 'true params') +
+         ylab('log-lambda') +
+         xlab(par.name) +
+         ylim(ll.lim),
+       pl.ML = ggplot(data.frame(x = par.values,
+                                   y = LL.ML), aes(x = x, y = y)) +
+         geom_line() +
+         geom_vline(xintercept = ML.est[par.idx], linetype = 2)+
+         labs(title = 'ML est')+
+         ylab('log-lambda') +
+         xlab(par.name) +
+         ylim(ll.lim),
+       df = df)
+}
+```
+
+```{r}
+# theta1
+# const <- 4
+# theta1.v <- seq(ML.optim$par[4] - const, 
+#                 ML.optim$par[4] + const,length.out = 100)
+plotllambda.th1 <- toplot.loglambda.comp(theta1.v, 1, 'theta1', 
+                                    theta.par = t.parms,
+                                    ML.est = ML.optim$par,
+                                    ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotllambda.th1[1:2], cols = 2)
+```
+
+```{r}
+plotllambda.th2 <- toplot.loglambda.comp(theta2.v, 2, 'theta2', 
+                                    theta.par = t.parms,
+                                    ML.est = ML.optim$par,
+                                    ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotllambda.th2[1:2], cols = 2)
+```
+
+
+```{r}
+plotllambda.th3 <- toplot.loglambda.comp(theta3.v, 3, 'theta3', 
+                                    theta.par = t.parms,
+                                    ML.est = ML.optim$par,
+                                    ss2, M0 = 2.5, Tlim = 10)
+
+
+multiplot(plotlist = plotllambda.th3[1:2], cols = 2)
+
+#plot(plotllambda.th3$df$x[plotllambda.th3$df$typ == 'ml'], 
+#     plotllambda.th3$df$y[plotllambda.th3$df$typ == 'ml'])
+```
+
+```{r}
+plotllambda.th4 <- toplot.loglambda.comp(theta4.v, 4, 'theta4', 
+                                    theta.par = t.parms,
+                                    ML.est = ML.optim$par,
+                                    ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotllambda.th4[1:2], cols = 2)
+```
+
+
+```{r}
+plotllambda.th5 <- toplot.loglambda.comp(theta5.v, 5, 'theta5', 
+                                    theta.par = t.parms,
+                                    ML.est = ML.optim$par,
+                                    ss2, M0 = 2.5, Tlim = 10)
+
+multiplot(plotlist = plotllambda.th5[1:2], cols = 2)
+```
+
+
+```{r}
+lin.loglambda.th1 <- 
+  toplot.loglambda.lin.comp(theta1.v, 1, 'theta1', ML.optim$par[1], 
+                          ML.optim$par, ss2, M0 = 2.5, Tlim = 10,
+                          derFUN.list = list(log.lambda.der.th1,
+                                             log.lambda.der.th2,
+                                             log.lambda.der.th3,
+                                             log.lambda.der.th4,
+                                             log.lambda.der.th5))
+
+
+lin.loglambda.th2 <- 
+  toplot.loglambda.lin.comp(theta2.v, 2, 'theta2', ML.optim$par[2], 
+                          ML.optim$par, ss2, M0 = 2.5, Tlim = 10,
+                          derFUN.list = list(log.lambda.der.th1,
+                                             log.lambda.der.th2,
+                                             log.lambda.der.th3,
+                                             log.lambda.der.th4,
+                                             log.lambda.der.th5))
+
+
+lin.loglambda.th3 <- 
+  toplot.loglambda.lin.comp(theta3.v, 3, 'theta3', ML.optim$par[3], 
+                          ML.optim$par, ss2, M0 = 2.5, Tlim = 10,
+                          derFUN.list = list(log.lambda.der.th1,
+                                             log.lambda.der.th2,
+                                             log.lambda.der.th3,
+                                             log.lambda.der.th4,
+                                             log.lambda.der.th5))
+
+
+lin.loglambda.th4 <- 
+  toplot.loglambda.lin.comp(theta4.v, 4, 'theta4', ML.optim$par[4], 
+                          ML.optim$par, ss2, M0 = 2.5, Tlim = 10,
+                          derFUN.list = list(log.lambda.der.th1,
+                                             log.lambda.der.th2,
+                                             log.lambda.der.th3,
+                                             log.lambda.der.th4,
+                                             log.lambda.der.th5))
+
+
+lin.loglambda.th5 <- 
+  toplot.loglambda.lin.comp(theta5.v, 5, 'theta5', ML.optim$par[5], 
+                          ML.optim$par, ss2, M0 = 2.5, Tlim = 10,
+                          derFUN.list = list(log.lambda.der.th1,
+                                             log.lambda.der.th2,
+                                             log.lambda.der.th3,
+                                             log.lambda.der.th4,
+                                             log.lambda.der.th5))
+```
+
+
+```{r, fig.height=10}
+multiplot(lin.loglambda.th1$pl,
+          lin.loglambda.th2$pl,
+          lin.loglambda.th3$pl,
+          lin.loglambda.th4$pl,
+          lin.loglambda.th5$pl)
+```
+
+
+
+```{r}
+pl.theta1 <- toplot.loglik.lin.comp(theta1.v, 1, 'theta1', ML.optim$par, ss2, M0 = 2.5, 
+                       Tlim, ML.optim$par, 
+                       by.s = 0.1)
+
+pl.theta2 <- toplot.loglik.lin.comp(theta2.v, 2, 'theta2', ML.optim$par, ss2, M0 = 2.5, 
+                       Tlim, ML.optim$par, 
+                       by.s = 0.1)
+
+pl.theta3 <- toplot.loglik.lin.comp(theta3.v, 3, 'theta3', ML.optim$par, ss2, M0 = 2.5, 
+                       Tlim, ML.optim$par, 
+                       by.s = 0.05)
+
+pl.theta4 <- toplot.loglik.lin.comp(theta4.v, 4, 'theta4', ML.optim$par, ss2, M0 = 2.5, 
+                       Tlim, ML.optim$par, 
+                       by.s = 0.1)
+
+pl.theta5 <- toplot.loglik.lin.comp(theta5.v, 5, 'theta5', ML.optim$par, ss2, M0 = 2.5, 
+                       Tlim, ML.optim$par, 
+                       by.s = 0.1)
+
+
+```
+
+```{r, fig.height=10}
+multiplot(pl.theta1,
+          pl.theta2,
+          pl.theta3,
+          pl.theta4,
+          pl.theta5)
+```
+
+
+
+
+

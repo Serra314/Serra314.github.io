@@ -1,0 +1,39 @@
+---
+title: "documentation"
+author: "Francesco Serafini"
+date: "02/09/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Function for intensity
+
+Function \texttt{g.m()} 
+
+1. calculate $\exp\{\exp(\theta_3)(\mathbf{m}_h - M_0)\}$ 
+2. $\mathbf m_h$ vector of past magnitudes
+3. $M_0$ magnitude of completeness
+
+Function \texttt{g.t()} 
+
+1. calculate $1/(t - \mathbf{t}_h + \exp\theta_4)^{\exp(\theta_5) + 1}$
+2. $t$ time of evaluation (single value)
+3. $\mathbf t_h$ vector of past magnitudes 
+
+
+Function \texttt{g.s()}
+
+1. calculate $(1/2\pi|\Sigma|)\exp\{(\mathbf s - \mathbf s_{h,i})^t \Sigma^{-1}(\mathbf s - \mathbf s_{h,i})\}$ 
+2. $\mathbf s$ location of evaluation (single location)
+3. $\{s_{h,i}, i = 1,...,N\}$ past locations (multiple)
+
+Function \texttt{logLambda()}
+
+1. calculate the log-intensity for a given set of points 
+2. 
+
+
+
