@@ -12,10 +12,22 @@ library(MASS)
 library(raster)
 
 # stable magnitude triggering function.
-# th.n and th.p are thresholds such that 
-# if theta3 + log(m - M0) < th.n we approximate linearly around th.n
-# if theta3 + log(m - M0) > th.p we approximate linearly around th.p
+# mandatory input : --> m : magnitude value (has to be m > M0)
+#                 : --> theta3 : value of the parameter (theta3 = log(alpha))
+#                 : --> M0 : completeness magnitude
+# optional input  : --> th.n : threshold s.t. if theta3 + log(m - M0) < th.n we approx linearly around th.n
+#                 : --> th.p : threshold s.t. if theta3 + log(m - M0) > th.p we approx linearly around th.p
+
+# ouput : numeric -value of g.m(m, theta3) = exp(exp(theta3)*(m - M0))
+
+# notes : if m is scalar and theta3 is a vector the output is a vector with components g.m(m, theta3_i)
+#         if theta3 is scalar and m is a vector the output is a vector with components g.m(m_i, theta3)
+#         if both theta3 and m are vector (same length required) the output is a vector g.m(m_i, theta3_i)
+#         same rationale applies to M0
+#         parameters has to be numeric
+
 g.m <- function(m, theta3, M0, th.n = -29, th.p = 4){
+  # stop if magnitude lower than magnitude of completeness
   if(any(m - M0 < 0)){
     stop('m smaller than completeness threshold')
   }
@@ -23,79 +35,166 @@ g.m <- function(m, theta3, M0, th.n = -29, th.p = 4){
   if(any(theta3 + log(m - M0) < th.n)){
     theta3.0 <- th.n - log(m - M0)
     log.app <- theta3.0 + log(m - M0)
+    # linear approximation around theta3.0
     exp(exp(log.app)) + exp(exp(log.app))*exp(theta3.0)*(m - M0)*(theta3 - theta3.0)
   }
   # if too positive
   else if(any(theta3 + log(m - M0) > th.p)){
     theta3.0 <- th.p - log(m - M0)
     log.app <- theta3.0 + log(m - M0)
+    # linear approximation around theta3.0
     exp(exp(log.app)) + exp(exp(log.app))*exp(theta3.0)*(m - M0)*(theta3 - theta3.0)
   }
   else{
+    # compute the log of the exponent
     log.app <- theta3 + log(m - M0)
+    # return double exponential (a bit dangerous, might be changed)
     exp(exp(log.app))
   }
   exp(exp(theta3)*(m - M0))
 }
 
 
-g.t <- function(tt, theta4, theta5, Ht.times, th.p = 5, th.n = -20){
-  time.diff <- tt - Ht.times
-  output <- rep(0, length(time.diff))
-  idx.p <- time.diff > 0
-  logoutput.pos <- (-exp(theta5) - 1)*log(time.diff[idx.p] + exp(theta4))
+# function to plot g.m as function of the magnitude for different values of theta3
+toplot.gm <- function(theta3.seq, mm, M0){
+  gm.list <- lapply(theta3.seq, function(x) data.frame(mags = mm,
+                                                       gm = g.m(mm, x, M0),
+                                                       theta3 = x))
+  gm.df <- bind_rows(gm.list)
+  
+  ggplot(gm.df, aes(x = mags, y = gm, color = as.factor(theta3), 
+                    linetype = as.factor(theta3))) + 
+    geom_line() + 
+    labs(color = "theta3", linetype = 'theta3')
+  
+}
 
+
+
+# stable time triggering function.
+# mandatory input : --> tt : time value (t)
+#                 : --> theta4 : value of the parameter (theta4 = log(c))
+#                 : --> theta5 : value of the parameter (theta5 = log(p - 1))
+#                 : --> past obervation (t_i)
+# optional input  : --> th.p : threshold s.t. if (-exp(theta5) - 1)*log(t - t_i + exp(theta4)) > th.p 
+#                              we approx linearly around th.p
+#                 : --> th.n : threshold s.t. if (-exp(theta5) - 1)*log(t - t_i + exp(theta4)) < th.n 
+#                              we approx linearly around th.n
+
+# ouput : numeric -value of g.t(t - t_i, theta4, theta5) = I(t-t_i > 0)*(t - t_i + exp(theta4))^(-(exp(theta5) + 1))
+#         where I(t - t_i > 0) indicator funcion, it is 1 when the condition is true
+# notes : if t is scalar and t_i is a vector the output is a vector with components g.m(t - t_i, theta4, theta5)
+#         if t_i is scalar and t is a vector the output is a vector with components g.m(t_j - t_i, theta4, theta5)
+#         if both t and t_i are vector (same length required) the output is a vector g.m(t_j - t_ij, theta4, theta5)
+#         same rationale applies to theta4, theta5
+#         parameters has to be numeric
+
+g.t <- function(tt, theta4, theta5, Ht.times, th.p = 5, th.n = -20){
+  # compute the difference in time (t - t_i)
+  time.diff <- tt - Ht.times
+  # prepare output (its 0 if t - t_i < 0)
+  output <- rep(0, length(time.diff))
+  # identify positive time differences
+  idx.p <- time.diff > 0
+  # compute log_output only for positive time differences
+  logoutput.pos <- (-exp(theta5) - 1)*log(time.diff[idx.p] + exp(theta4))
+  # approximate if too high
   if(any(logoutput.pos > th.p)){
+    # update only positions above threshold
     idx.toolarge <- logoutput.pos > th.p
     output.app <- exp(logoutput.pos)
     output.app[idx.toolarge] <- exp(th.p) + (logoutput.pos[idx.toolarge] - th.p)*exp(th.p)
+    # update only positive time differences positions
     output[idx.p] <- output.app
     output
   }
+  # approximate if too low
   else if(any(logoutput.pos < th.n)){
+    # update only positions below threshold
     idx.tooneg <- logoutput.pos < th.n
     output.app <- exp(logoutput.pos)
     output.app[idx.tooneg] <- exp(th.n) + (logoutput.pos[idx.tooneg] - th.n)*exp(th.n)
+    # update only positive time differences positions
     output[idx.p] <- output.app
     output
   }
   else{
+    # update only positive time differences positions
     output[idx.p] <- exp(logoutput.pos)
     output
   }
-  exp(logoutput.pos)
 }
 
 
-# spatial triggering
+# spatial triggering function (Bidimensional Gaussian density)
+# mandatory input : --> loc : 2D-location (s)
+#                 : --> Ht.locs : observed 2D-locations (s_i), used as mean of the Gaussian kernel
+#                 : --> Sigma.p : 2x2 covariance matrix composed by sigma^2_x, sigma^2_y, sigma_xy
+#                                
+
+# output : numeric -value of the function g.s(s - s_i, Sigma)
+
+# notes: Sigma.p has to e a valid covariance matrix (positive-semidefinite)
+#      : Ht.locs has to be a matrix or data.frame with only two columns representing the locations
+#        those locations will be used as means of the Gaussian kernel          
+
 g.s <- function(loc, Ht.locs, Sigma.p){
+  # stop if Sigma not a matrix
   if(!is.matrix(Sigma.p)){
     stop('Sigma not a matrix')
   }
+  # stop if Sigma not square matrix
   if(ncol(Sigma.p) != nrow(Sigma.p)){
     stop('Sigma wrong dimensions')
   }
   det.S <- det(Sigma.p)
+  # stop if Sigma not a suitable covariance matrix
   if(det.S <= 0){
     stop('Sigma not positive semi-definite')
   }
+  # compute the Gaussian Kernel for row of Ht.locs
   out <- sapply(1:nrow(Ht.locs), function(x) 
     dmvnorm(loc, mean = as.numeric(Ht.locs[x,]), sigma = Sigma.p))
   out
 }
 
 
-# QUESTION : for the sampling with the thinning technique we do not account for the magnitude
-#            if we would account for the magnitude of each event also, it would be very difficult to retain
-#            any high magnitude event. However, I feel it is the right way to implement this thing.
-
-
-# intensity function without considering magnitude of event
-# this for now assumes a homogeneous background rate
-logLambda <- function(ppoints, theta.vec, Ht, M0){
-  tt <- as.numeric(ppoints[1])
-  loc <- as.numeric(ppoints[2:3])
+# function to plot the spatial triggering function g.s in space given two sequences of values x.seq and y.seq
+toplot.gs <- function(Mu, Sigma, x.seq, y.seq){
   
+  df <- expand.grid(x.seq, y.seq)
+  colnames(df) <- c('x', 'y')
+  df$density <- sapply(1:nrow(df), function(x) dmvnorm(df[x,1:2], mean = Mu,
+                                                       sigma = Sigma))
+  
+  ggplot(df, aes(x = x, y = y, fill = density, z = density)) + 
+    geom_tile() + #geom_contour() + 
+    scale_fill_viridis() + 
+    geom_point(aes(x = Mu[1], y = Mu[2])) + 
+    labs(title = paste0('Sigma.xy = ', Sigma[2,1])) + 
+    theme(legend.position = 'bottom')
+}
+
+
+# function to calculate the conditional log-intensity
+# mandatory input : --> ppoints : points at which evaluate the conditional log-intensity (see notes)
+#                 : --> theta.vec : vector of parameters (see notes)
+#                 : --> Ht : history of the process (see notes)                                              
+#                 : --> M0 : completeness magnitude
+
+# output : numeric -value of the conditional log-intensity log(lambda(ppoints | Ht))
+
+# notes : theta.vec = (theta1 = log(mu), theta2 = log(K), theta3 = log(alpha), theta4 = log(c), theta5 = log(p - 1), 
+#                      theta6 = sigma^2_x, theta7 = sigma^2_y, theta8 = sigma^2_xy
+#       : ppoints has to be a data.frame with time column called "ts" and location "x", "y"
+#       : Ht have the same format of ppoints with the addition of the magnitude column called "mags"
+
+logLambda <- function(ppoints, theta.vec, Ht, M0){
+  # extract time and space location
+  tt <- as.numeric(ppoints$ts)
+  loc <- c(ppoints$x, ppoints$y)
+  
+  # extract parameters
   theta1 <- theta.vec[1]
   theta2 <- theta.vec[2]
   theta3 <- theta.vec[3]
@@ -105,93 +204,96 @@ logLambda <- function(ppoints, theta.vec, Ht, M0){
   sigmay <- exp(theta.vec[7])
   sigmaxy <- exp(theta.vec[8])
   
+  # construct Sigma 
   Sigma.p <- matrix(c(sigmax, sigmaxy, sigmaxy, sigmay), ncol = 2, byrow = TRUE)
+  
+  # extract information on past observations
   past.locs <- cbind(Ht$long, Ht$lat)
   past.t <- Ht$ts
   past.m <- Ht$mags
-  # magnitude triggering
   
+  # magnitude triggering
   gm.v <- as.vector(g.m(past.m, theta3, M0))
+  # time triggering
   gt.v <- as.vector(g.t(tt, theta4, theta5, past.t))
+  # space triggering
   gs.v <- as.vector(g.s(loc, past.locs, Sigma.p))
   
-  # calculate summation
+  # calculate log of the summation
   log.trigs <- theta2 + log(sum(gm.v*gt.v*gs.v))
-  # return intensity
-  
+  # return logintensity intensity
   log(exp(theta1) + exp(log.trigs))
-  #logSumExp(c(theta1, log.trigs))
+  # for a more stable version this should be right.
+  # logSumExp(c(theta1, log.trigs))
   
 }
-
-
-## function to sample 
-
-point_sampler <- function(loglambda, bdy, mesh, num_events, crsobj = NULL){
-  ## Number of events for single catalogue from a poisson distribution with lambda = num_events
-  #cat_n <- rpois(1, num_events)
-  loglambda_max <- max(loglambda)
-  ## number of points to sample at a time - might want to adjust depending on how many points you want to actually retain.
-  n.points = 10000
-  
-  ## Set up a spatialpoints dataframe for our results
-  samp.points <- SpatialPoints(data.frame(x = 0, y = 0))
-  samp.points$mags <- 0
-  samp.points <- samp.points[-1,]
-  if(!is.null(crsobj)){
-    proj4string(samp.points) <- crsobj}
-  num <- 0
-  
-  ## To sample the correct number of points, keep going until the num >= cat_n
-  while (num < num_events){
-    points <- spsample(bdy, n.points, "random")
-    ## transform to wgs84 long/lat
-    if(!is.null(crsobj)){pts <- spTransform(points, crsobj)}
-    else{pts <- points}
-    ## next few lines modified directly from sample.lgcp
-    proj <- INLA::inla.mesh.project(mesh, pts)
-    lambda_ratio <- exp(as.vector(proj$A %*% loglambda) - loglambda_max)
-    keep <- proj$ok & (runif(n.points) <= lambda_ratio)
-    kept <- pts[keep]
-    kept$mags <- rep(0, length(kept))
-    if(length(kept) > 0){
-      samp.points <- rbind(samp.points, kept)
-      num <- length(samp.points)
-    }
-    else{
-      #print('no retained')
-    }
-  }
-  
-  ## Keep exactly cat_n points, choose these randomly from all of the points we've kept so far
-  kp <- sample(seq(1, length(samp.points), by=1), num_events, replace=FALSE)
-  samp.points <- samp.points[kp,]
-  ## Get magnitudes for this catalogue
-  #samp.points$mags <- TapGRM(cat_n, b_val, 8, m_min)
-  
-  return(samp.points)
-}
-
-
 
 
 # function to calculate the integral of the time-triggering function
-# between Ht and Tlim. It can be seen as the points generated by the time effect between Ht.ts and Tlim
+# mandatory input : --> T1 : start of the time interval
+#                 : -->  T2 : end of the time interval
+#                 : --> theta4,5 --> parameters of the Omori's law (theta5 = log(p-1))
+#                 : --> Ht.ts --> observed time points 
 
-# input : Tlim --> Extreme of the interval of time on which calculate the integral
-#         theta4,5 --> parameters of the Omori's law (theta5 = log(p-1))
-#         Ht --> observed time points 
+# output : numeric - The integral of the unnormalized Omori's law given by
+# int_[T1,T2] (t - t_i + exp(theta4))^(-(exp(theta5) + 1))dt
 
-# output : numeric - The integral of the UNNORMALIZED Omori's law 
-# notes : reliable only if AT MOST one input is a vector
+# notes : if one of the inputs is a vector and the others are scalars the function returns a vector
+#       : if more than one input is a vector they have to be of the same dimension, the ouput is a vector
 
-I.t <- function(Tlim, theta4, theta5, Ht.ts){
-  exp(-theta5)*(exp(-theta4*exp(theta5)) - (Tlim - Ht.ts + exp(theta4))^(-exp(theta5)))
+I.t <- function(T1, T2, theta4, theta5, Ht.ts){
+  # if the observation is after the time interval returns zero
+  if(Ht.ts > T2){return(0)}
+  # lower extreme is the minum between T1 and observation, before the latter the integrand is zero
+  T.low <- max(Ht.ts, T1)
+  # evaluate the integral
+  -exp(-theta5)*((T2 - Ht.ts + exp(theta4))^(-exp(theta5)) - (T.low - Ht.ts + exp(theta4))^(-exp(theta5)))
+}
+
+## Inverse function of I.t (used to perform inversion sampling for sampling times)
+# mandatory inputs : --> : It : value to be transformed
+#                  : --> : theta4, theta5 : value of the parameters of gt
+#                  : --> Ht.ts : past time observation (t_i)
+
+# ouput : numeric - considering It(t1) = int_[0,t1] gt(t-t_i)dt 
+#                   the outpur is InvIt(It) such that InvIt(It(t1)) = t1 
+
+Inv.I.t <- function(It, theta4, theta5, Ht.ts){
+  (exp(-theta4*exp(theta5)) + It*(-exp(theta5)))^(-1/exp(theta5)) + Ht.ts - exp(theta4) 
 }
 
 
-## DOC: integral of the spatial triggering function.
-# we are using a Gaussian density for which it is easy to retrieve
+# function to place aftershocks in time
+# mandatory inputs : --> n.ev : number of events to be placed
+#                  : --> theta4,5 : parameters of the time-triggering function (gt(t - t_i))
+#                  : --> Ht.ts : past time location (t_i)
+#                  : --> T1, T2 : extremes of the time interval (see notes)
+
+# output : numeric - sample of n.ev times from a point process with intensity lambda(t) = gt(t- t_i)
+
+# notes : the sampled times are between T1 and T2
+sample.omori <- function(n.ev, theta4, theta5, Ht.ts, T1, T2){
+  if(n.ev == 0){return(NA)}
+  bound.l <- I.t(Ht.ts, T1, theta4, theta5, Ht.ts)
+  bound.u <- I.t(Ht.ts, T2, theta4, theta5, Ht.ts)
+  unif.s <- runif(n.ev, min = bound.l, max = bound.u)
+  t.sample <- Inv.I.t(unif.s, theta4, theta5, Ht.ts)
+  t.sample
+}
+
+
+
+# function to calculate the integral of the space-triggering function
+# mandatory input : --> x.lim : two values representing range of values of x
+#                 : --> y.lim : two values representing range of values of y
+#                 : --> Sigma : 2x2 covariance matrix
+#                 : --> past.loc : observed locations (s_i) 
+
+# output : numeric - The integral of the unnormalized Omori's law given by
+# int_[A] gs(s - s_i)ds where A is a square with locations in the range x.lim, y.lim
+
+# notes : the inputs have to be numeric, no matrix allowed
+#       : past.loc can be outside the boundaries
 
 I.s <- function(x.lim, y.lim, Sigma, past.loc){
   pmvnorm(lower = c(x.lim[1], y.lim[1]), upper = c(x.lim[2], y.lim[2]),
@@ -199,372 +301,485 @@ I.s <- function(x.lim, y.lim, Sigma, past.loc){
 }
 
 # function that calculate I.s when Ht contains multiple points
-# the observed points DO NOT need to be in the domain indicated by xlim/ylim
+# past.loc.multi has to be a matrix or data.frame with only two columns representing the locations
 
 I.s.multi <- function(x.lim, y.lim, Sigma, past.loc.multi){
   sapply(1:nrow(past.loc.multi), function(x) 
     I.s(x.lim, y.lim, Sigma, past.loc.multi[x,]))
 }
 
-## to sample from Omoris
 
-Inv.I.t <- function(Lambda, theta4, theta5, Ht.ts){
-  (exp(-theta4*exp(theta5)) + Lambda*(-exp(theta5)))^(-1/exp(theta5)) + Ht.ts - exp(theta4) 
-}
+# function to calculate the number of aftershock triggered by a past observation
+# mandatory inputs : --> theta.v : parameters vector
+#                  : --> Ht.single : a single observation (see notes)
+#                  : --> T1 : start of the time interval
+#                  : --> T2 : end of the time interval
+#                  : --> M0 : magnitude of completeness
+#                  : --> bdy : polygon representing the area (A) (see notes) 
 
+# output : expected number of points triggered by an event (Ht.single = (t_i, s_i, m_i)) 
+# given by the integral int_[T1,T2] int_[A] K*gm(m_i)*gt(t - t_i)*gs(s - s_i)dtds
 
-sample.omori <- function(n.ev, theta4, theta5, Ht.ts, Tlim){
-  if(n.ev == 0){return('no samples')}
-  bound <- I.t(Tlim, theta4, theta5, Ht.ts)
-  ss <- runif(n.ev, min = 0, max = bound)
-  t.sample <- Inv.I.t(ss, theta4, theta5, Ht.ts)
-  if(all(t.sample > Tlim)){
-    return('no samples')}
-  sort(t.sample[t.sample < Tlim])
-}
-
-
-## two functions to sample the a GIVEN number of location according to the Gaussian 
-# triggering function. 
-# They dispose the number of observations generated by a past location
-
-# the last one can be IMPROVED considering that it samples 1 point for each cell, 
-# however if I already know that I need a xx samples in a cell I can sample 
-# those points all together.
-
-sample.from.idx <- function(idx, xy.grid, cell.size){
-  cell <- as.numeric(xy.grid[idx, 1:2])
-  c(x = runif(1, min = cell[1] - cell.size/2, max = cell[1] + cell.size/2),
-    y = runif(1, min = cell[2] - cell.size/2, max = cell[2] + cell.size/2))
-}
+# notes : Ht.single has to be a row of a data.frame with columns 
+#         "ts" (time), "x" , "y" (location) and "mags" (magnitude)
+#       : bdy has to be a SpatialPolygon -- for now it calculate the integral with respect to space over a square
+#         region circoscribing the input polygon.
 
 
-sample.spatial <- function(n.ev, x.lim, y.lim, nx, ny, Sigma, past.loc){
-  # create sequences
-  x.seq <- seq(x.lim[1], x.lim[2], length.out = nx)
-  y.seq <- seq(y.lim[1], y.lim[2], length.out = ny)
+triggered.n.ev <- function(theta.v, Ht.single, T1, T2, M0, bdy){
   
-  # retriece centroids
-  x.cent <- x.seq[-nx] + diff(x.seq)/2
-  y.cent <- y.seq[-ny] + diff(y.seq)/2
+  # extract parameters
+  theta2 <- theta.v[2]
+  theta3 <- theta.v[3]
+  theta4 <- theta.v[4]
+  theta5 <- theta.v[5]
+  sigmax <- exp(theta.v[6])
+  sigmay <- exp(theta.v[7])
+  sigmaxy <- exp(theta.v[8])
+  # construct Sigma
+  Sigma <- matrix(c(sigmax, sigmaxy, sigmaxy, sigmay), ncol = 2, byrow = TRUE)
   
-  # initialize grid
-  xy.grid <- expand.grid(x.cent, y.cent)
-  colnames(xy.grid) <- c('x', 'y')
-  
-  # calculate prob of being in each bin
-  xy.grid$probs <- 
-    sapply(1:nrow(xy.grid), function(i) 
-      pmvnorm(lower = as.numeric(xy.grid[i,1:2] - diff(x.seq)/2),
-              upper = as.numeric(xy.grid[i,1:2] + diff(x.seq)/2),
-              mean = past.loc, sigma = Sigma)[1])
-  
-  xy.grid$probs[xy.grid$probs < 0] <- 0
-  # sample the cells
-  cell.idx <- sample(1:nrow(xy.grid), n.ev, prob = xy.grid$probs, replace = TRUE)
-  
-  # sample uniformly from each bin
-  ss <- matrix(unlist(lapply(cell.idx, function(id) 
-    sample.from.idx(id, xy.grid, diff(x.seq)))), byrow = T, ncol = 2)
-  
-  # return data.frame of locations 
-  data.frame(x = ss[,1], y = ss[,2])
-}
-
-
-#crs=crs_wgs84
-
-
-# main issues:
-
-# - find a way to calculate mahalanobis distance using CRS
-# - the sample points function should sample the points only where the loglambda is over a certain threshold
-#   or points in a certain distance
-
-# The function to generate an ETAS sample should : 
-# 1) generate observations triggered by past seismicity
-# 2) sample background
-# 3) sample triggered by background and so on
-
-# 
-# g.s <- function(locs, mean.p, Sigma.p){
-#   if(!is.matrix(Sigma.p)){
-#     stop('Sigma not a matrix')
-#   }
-#   if(ncol(Sigma.p) != nrow(Sigma.p)){
-#     stop('Sigma wrong dimensions')
-#   }
-#   det.S <- det(Sigma.p)
-#   if(det.S <= 0){
-#     stop('Sigma not positive semi-definite')
-#   }
-#   inv.S <- ginv(Sigma)
-#   distances <-  pointDistance(locs, mean.p, lonlat = TRUE)/1000 #distance in km
-#   
-#   (1/(2*pi*sqrt(det.S)))*exp(-(1/2)*t(distances)%*%inv.S%*%distances)
-# }
-# 
-# library(MASS)
-# library(raster)
-# 
-# mm <- SpatialPoints(data.frame(x = 0, y = 0))
-# proj4string(mm) <- crswgs
-# mm <- spTransform(mm, crswgs)
-# 
-# pointDistance(a, mm, lonlat = TRUE)
-# pointDistance(a, mm, lonlat = FALSE)
-# 
-# plot(bdy)
-# points(a)
-# points(mm)
-# 
-# g.s(a, mm, Sigma)
-# 
-# 
-# #Sigma = matrix(c(0.2,0.1,0.1,0.2), byrow = T, ncol = 2)
-# 
-# Sigma = matrix(c(0.3, 0.29, 0.29, 0.3), byrow = T, ncol = 2)
-# 
-# ss <- Sys.time()
-# log.l <- log(dmvnorm(mesh.n$loc[,1:2], mean = c(0.5, 0.5), sigma = Sigma))
-# aa <- point_sampler(log.l, bdy, mesh.n, num_events = 1000)
-# print(Sys.time() - ss)
-# 
-# mm <- inla.mesh.projector(mesh.n, dims = c(20, 20))
-# mm2 <- inla.mesh.project(mm, exp(log.l))  
-# mm3 <- pixels(mesh.n, nx = 20, ny = 20)
-# mm3$canepone <- as.vector(mm2)
-# 
-# 
-# ss <- Sys.time()
-# aa2 <- sample.spatial(n.ev = 1000, x.lim = c(0,1), y.lim = c(0,1), nx = 30, ny = 30, 
-#                       Sigma = Sigma, past.loc= c(0.5, 0.5))
-# print(Sys.time() - ss)
-# 
-# 
-# pl1 <- ggplot() + gg(mm3) + gg(aa) + theme(legend.position = 'bottom')
-# pl2 <- ggplot() + gg(mm3) + geom_point(data = aa2, mapping = aes(x = x, y = y)) + 
-#   theme(legend.position = 'bottom')
-# 
-# multiplot(pl1, pl2, cols = 2)
-# 
-# pl1 <- ggplot(data = as.data.frame(aa), aes(x = x, y = y)) + geom_density_2d()
-# pl2 <- ggplot(data = aa2, aes(x = x, y = y)) + geom_density_2d()
-# 
-# multiplot(pl1, pl2, cols = 2)
-# 
-  
-
-
-
-
-
-
-# now theta.par has 8 components: mu, K, alpha, c, p
-# and sigmax2 sigmay2 sigmaxy
-
-# Ht has to be such that Ht[,1:2] locations,  Ht[,3] time, Ht[,4] magnitudes
-expected.n.triggered <- function(theta.par, Tlim, M0, 
-                                 x.lim, y.lim, Ht.multi){
-  
-  theta2 = theta.par[2]
-  theta3 = theta.par[3]
-  theta4 = theta.par[4]
-  theta5 = theta.par[5]
-  
-  sigmax = exp(theta.par[6])
-  sigmay = exp(theta.par[7])
-  sigmaxy = theta.par[8]
-  Sigma <- matrix(c(sigmax, sigmaxy, sigmaxy, sigmay), byrow = TRUE, ncol = 2)
-  
-  past.locs <- Ht.multi[,1:2]
-  past.ts <- Ht.multi[,3]
-  past.mags <- Ht.multi[,4]
-  
-  log.n <- theta2 + exp(theta3)*(past.mags - M0) + 
-    log(I.t(Tlim, theta4, theta5, past.ts)) + 
-    log(I.s.multi(x.lim, y.lim, Sigma, past.locs))
- 
-  exp(as.numeric(log.n))
-}
-
-# function to sample points generated by a past observation
-
-sample.triggered <- function(nn, theta.par, beta.par, Sigma, Tlim, M0,
-                             x.lim, y.lim, nx, ny, Ht.single, gen.idx){
-  if(nrow(Ht.single) > 1){
-    stop('Error - Multiple past events')
+  # Try to calculate the integral of the space-triggering - sometimes FAIL unexpectedly - see weird behavior
+  totry <- I.s(bdy@bbox[1,],bdy@bbox[2,],Sigma, cbind(Ht.single$x, Ht.single$y))
+  # if it is NA we assume that the integral of the space-triggering is 1 (which is its maximum)
+  if(is.na(totry)){
+    return(exp(theta2)*exp(exp(theta3)*(as.numeric(Ht.single$mags) - M0))*
+             I.t(T1, T2, theta4,theta5, as.numeric(Ht.single$ts)))
   }
-  past.ts <- Ht.single$ts
-  past.loc <- c(Ht.single$x, Ht.single$y)  
-  ss <- sample.spatial(nn, x.lim, y.lim, nx, ny, Sigma, as.numeric(past.loc))
-  
-  dd <- data.frame(x = ss[,1], y = ss[,2],
-                   ts = sample.omori(nn, theta.vec[4], theta.vec[5], 
-                                     past.ts, Tlim = Tlim),
-                   mags = rexp(nn, beta.par) + M0,
-                   gen = gen.idx)
-  dd[order(dd$ts), ]
+  else{
+    return(exp(theta2)*exp(exp(theta3)*(as.numeric(Ht.single$mags) - M0))*
+             I.t(T1, T2, theta4,theta5, as.numeric(Ht.single$ts))*totry)
+  }
 }
 
 
 
+## function to place in space the aftershocks of a past event
+# mandatory input : --> n.ev : number of aftershocks to be generated
+#                 : --> bdy : area in which they have to be generated
+#                 : --> Ht.loc: past observation generating the aftershocks
+#                 : --> Sigma: 2x2 covariance matrix for space-triggering function
+#                 : --> crsobj : CRS object to project the locations
+
+# output : SpatialPoints- set of n.ev points extracted from a point process with intensity 
+#                         given by gs(s - s_i)
 
 
-sample.ETAS <- function(theta.par, beta.par, M0, Tlim, 
-                        x.lim, y.lim, nx, ny, n.core = 5){
-  theta1 <- theta.par[1]
-  theta2 <- theta.par[2]
-  theta3 <- theta.par[3]
-  theta4 <- theta.par[4]
-  theta5 <- theta.par[5]
+sample.given.loc <- function(n.ev, bdy, Ht.loc, Sigma, crsobj){
   
-  sigmax = exp(theta.par[6])
-  sigmay = exp(theta.par[7])
-  sigmaxy = theta.par[8]
-  Sigma <- matrix(c(sigmax, sigmaxy, sigmaxy, sigmay), byrow = TRUE, ncol = 2)
+  # initialize empty SpatialPoints
+  samp.points <- SpatialPoints(data.frame(x = 0, y = 0))
+  samp.points <- samp.points[-1,]
+  proj4string(samp.points) <- crswgs
+  # initialize number of placed events
+  num <- 0
   
-  # extract number of backgroud events
-  Lambda.back <- exp(theta1)*Tlim*(diff(x.lim)*diff(y.lim))
-  n.backg <- rpois(1, lambda = Lambda.back)
-  print(c(n.backg, 0))
-  # extract times and locations homogeneously
-  backg.t <- runif(n.backg, min = 0, max = Tlim)
-  backg.mags <- rexp(n.backg, beta.par) + M0
-  backg.s <- cbind(runif(n.backg, min = x.lim[1], max = x.lim[2]),
-                   runif(n.backg, min = y.lim[1], max = y.lim[2]))
-  
-  # store them
-  backg.df <- data.frame(x = backg.s[,1],
-                         y = backg.s[,2],
-                         ts = backg.t,
-                         mags = backg.mags,
-                         gen = 0)
-  
-  # Initialize past.gens list with events sorted by time.
-  Past.Gens <- list(backg.df[order(backg.df$ts),])
-  
-  flag = T
-  gen.idx = 1
-  while(flag){
-    # take previous generation
-    past.events <- Past.Gens[[gen.idx]]
-    past.events <- data.frame(past.events)
-    n.past.ts <- nrow(past.events)
-    
-   
-    # for each of them sample the number of offsprings
-    Lambdas <- expected.n.triggered(theta.par, Tlim, M0, x.lim, y.lim,
-                                    past.events)
-    
-    n.off <- rpois(n.past.ts, lambda = Lambdas)
-    print(n.off)
-    # exit condition if none of the event in the previous generation has
-    # offsprings
-    if(all(n.off == 0)){
-      Gens.df <- bind_rows(Past.Gens)
-      Gens.df <- Gens.df[order(Gens.df$ts),]
-      return(Gens.df)
+  # until we placed all the events
+  while (num < n.ev){
+    # sample from the 2D Gaussian kernel without boundaries
+    pts.matrix <- rmvnorm(n.ev, mean = as.numeric(Ht.loc), sigma = Sigma)
+    # transform the sample in SpatialPoints and project
+    pts <- data.frame(x = pts.matrix[,1], y = pts.matrix[,2])
+    coordinates(pts) <- ~ x + y
+    proj4string(pts) <- crsobj
+    pts <- spTransform(pts, crsobj)
+    # discard the ones outside bdy
+    pts <- crop(pts, bdy)
+    # merge sampled points
+    if(length(pts) > 0){
+      samp.points <- rbind(samp.points, pts)
+      num <- length(samp.points)
     }
-    # select only times which has generated events
-    past.events <- past.events[n.off > 0,]
-    n.off <- n.off[n.off > 0]
-    
-    # generate offsprings for each past event
-    
-    offsprings.list <- mclapply(1:length(n.off), function(x)
-      sample.triggered(n.off[x], theta.par, beta.par, Sigma, Tlim, M0,
-                       x.lim, y.lim, nx, ny, Past.Gens[[gen.idx]][x,] ,
-                       gen.idx), mc.cores = n.core)
-
-    # offsprings.list <- list()
-    # 
-    # for(i in 1:nrow(past.events)){
-    #   print('###')
-    #   print(n.off[i])
-    #   print(past.events[i,])
-    #   offsprings.list[[i]] <- sample.triggered(n.off[i], theta.par, beta.par, 
-    #                                            Sigma, Tlim, M0,
-    #                                            x.lim, y.lim, nx, ny, 
-    #                                            past.events[i,] ,
-    #                                            gen.idx)
-    #   print('-------')
-    # }
-    # 
-    
-    
-    offsprings.df <- rbindlist(offsprings.list)
-    
-    offsprings.df <-
-      offsprings.df %>%
-      filter(ts != 'no samples') %>%
-      mutate(ts = as.numeric(ts))
-    
-    print(c(nrow(offsprings.df), gen.idx))
-    # update gen.idx
-    gen.idx <- gen.idx + 1
-    Past.Gens[[gen.idx]] <- offsprings.df
+    else{
+      #print('no retained')
+    }
   }
+  
+  ## if we retained a number of points > n.ev, we select n.ev events at random
+  kp <- sample(seq(1, length(samp.points), by=1), n.ev, replace=FALSE)
+  samp.points <- samp.points[kp,]
+  samp.points
 }
 
 
-# theta.vec <- c(3, log(0.02), log(1.5), log(0.01), log(0.3), 
-#                log(0.001), log(0.001), 0)
-# 
-# 
-# Sigma <- matrix(c(0.001, 0, 0, 0.001), byrow = T, ncol = 2)
-# toplot.gs(c(0.5, 0.5), Sigma, x.seq, y.seq)
-# 
-# 
-# beta.par <- 2.3
-# M0 = 2.5
-# Tlim = 10
-# x.lim = c(0,1)
-# y.lim = c(0,1)
-# nx = 100
-# ny = 100
-# 
-# expected.n.triggered(theta.vec, Tlim, M0, x.lim, y.lim, 
-#                      data.frame(x = 0.2, y = 0.2, ts = 1, mags = 3))
-# 
-# dd <- sample.ETAS(theta.vec, beta.par, M0, Tlim, x.lim, y.lim, nx, ny)
-# 
-# nrow(dd)
-# 
-# hist(dd$ts)
-# ggplot(dd, aes(x = ts, y = mags)) + geom_point()
-# 
-# pl1.s <- ggplot(dd, aes(x = x, y = y, color = as.factor(gen))) + geom_point() + 
-#   xlim(0,1) + ylim(0,1) + theme(legend.position = 'none') + 
-#   labs(title = paste0('N = ', nrow(dd)))
-# 
-# 
-# theta.vec2 <- c(3, log(0.02), log(1.5), log(0.01), log(0.3), 
-#                log(0.01), log(0.01), 0.009)
-# 
-# Sigma <- matrix(c(0.01, 0.009, 0.009, 0.01), byrow = T, ncol = 2)
-# toplot.gs(c(0.5, 0.5), Sigma, x.seq, y.seq)
-# 
-# expected.n.triggered(theta.vec2, Tlim, M0, x.lim, y.lim, 
-#                      data.frame(x = 0.2, y = 0.2, ts = 1, mags = 3))
-# 
-# dd2 <- sample.ETAS(theta.vec2, beta.par, M0, Tlim, x.lim, y.lim, nx, ny)
-# 
-# nrow(dd2)
-# 
-# hist(dd2$ts)
-# ggplot(dd2, aes(x = ts, y = mags)) + geom_point()
-# 
-# pl2.s <- ggplot(dd2, aes(x = x, y = y, color = as.factor(gen))) + geom_point() + 
-#   xlim(0,1) + ylim(0,1) + theme(legend.position = 'none') +
-#   labs(title = paste0('N = ', nrow(dd2)))
-# 
-# 
-# multiplot(pl1.s, pl2.s, cols = 2)
-# 
-# 
-# 
-# sample.lgcp
-# 
-# 
-# 
+
+# function to place in space and time aftershocks of one event
+# mandatory inputs : --> theta.v --> parameters vector
+#                  : --> beta.p --> parameter of the GR law for the magnitude
+#                  : --> n.ev : number of aftershocks to be generated
+#                  : --> Ht.single: past observation generating the aftershocks
+#                  : --> Sigma: 2x2 covariance matrix for space-triggering function
+#                  : --> crsobj : time interval in which events have to be placed
+#                  : --> bdy : area in which events have to be placed
+#                  : --> crsobj : CRS object to project the locations
+
+# output : data.frame - columns are time "ts", magnitude "mags" and location "x", "y", they are a sample of 
+#                       n.ev events from a point process with intensity 
+#                       lamdba(t,s,m) = beta.p*exp(-beta.p*(m - M0))*gs(s - s_i)*g(t-t_i)
+
+# notes : Ht.single has to be a data.frame formatted as the output ("ts" = time, "mags" = magnitude.
+#                                                                   "x", "y" = location)
+
+sample.triggered <- function(theta.v, beta.p, n.ev, Ht.single, T1, T2, M0, bdy, crsobj){
+  # if the number of events to be placed is zero returns an empty data.frame
+  if(n.ev == 0){
+    samp.points <- data.frame(x = 1, y = 1, ts = 1, mags = 1)
+    samp.points <- samp.points[-1,]
+    return(samp.points)
+  }
+  else{
+    # initialize parameters
+    theta4 <- theta.v[4]
+    theta5 <- theta.v[5]
+    sigmax <- exp(theta.v[6])
+    sigmay <- exp(theta.v[7])
+    sigmaxy <- exp(theta.v[8])
+    # construct Sigma
+    Sigma <- matrix(c(sigmax, sigmaxy, sigmaxy, sigmay), ncol = 2, byrow = TRUE)
+    # extract information about parent
+    Ht.loc <- c(Ht.single$x, Ht.single$y)
+    Ht.ts <- as.numeric(Ht.single$ts)
+    Ht.mags <- as.numeric(Ht.single$mags)
+    
+    # sample times
+    samp.ts <- sample.omori(n.ev, theta4, theta5, Ht.ts, T1, T2)
+    # sample magnitudes
+    samp.mags <- rexp(n.ev, rate = beta.p) + M0
+    # sample locations
+    samp.locs <- sample.given.loc(n.ev, bdy, Ht.loc, Sigma, crsobj)
+    
+    # build output dataset
+    samp.points <- data.frame(ts = samp.ts, mags = samp.mags, x = samp.locs@coords[,1],
+                              y = samp.locs@coords[,2])
+    # return only the ones with time different from NA (the one with NA are outside the interval T1, T2)
+    # even though it should not happen given how we built sample.omori
+    return(samp.points[!is.na(samp.points$ts),])
+  }
+  
+}
+
+# sample a generation of aftershocks from a set of parents event Ht
+# mandatory inputs : --> theta.v --> parameters vector
+#                  : --> beta.p --> parameter of the GR law for the magnitude
+#                  : --> n.ev : number of aftershocks to be generated
+#                  : --> Ht: past observations generating the aftershocks
+#                  : --> Sigma: 2x2 covariance matrix for space-triggering function
+#                  : --> M0 : completeness magnitude
+#                  : --> bdy : area in which events have to be placed
+#                  : --> crsobj : CRS object to project the locations
+
+# optional parameters : --> ncore : number of cores used for parallelization
+
+# output : data.frame - columns are time "ts", magnitude "mags" and location "x", "y", they are a sample of 
+#                       n.ev events from a point process with intensity 
+#                       lamdba(t,s,m) = beta.p*exp(-beta.p*(m - M0))*gs(s - s_i)*g(t-t_i)
+
+# notes : Ht.single has to be a data.frame formatted as the output ("ts" = time, "mags" = magnitude.
+#                                                                   "x", "y" = location)
+
+
+sample.generation <- function(theta.v, beta.p, Ht, T1, T2, M0, bdy, crsobj, ncore = 2){
+  # number of parents
+  n.parent <- nrow(Ht)
+  
+  # calculate the aftershock rate for each parent in history
+  trig.rate.v <- sapply(1:n.parent, function(x) 
+    triggered.n.ev(theta.v, Ht[x,], T1, T2, M0, bdy))
+  # extract number of aftershock for each parent
+  n.ev.v <- sapply(1:n.parent, function(x) rpois(1, trig.rate.v[x]))
+  
+  # if no aftershock has to be generated returns empty data.frame
+  if(sum(n.ev.v) == 0){
+    app <- data.frame(x = 1, y = 1, ts = 1, mags = 1)
+    app <- app[-1,]
+    return(app)
+  }
+  
+  # identify parent with number of aftershocks > 0 
+  idx.p <- which(n.ev.v > 0)
+  # sample (in parallel) the aftershocks for each parent 
+  sample.list <- mclapply(idx.p, function(x) 
+    sample.triggered(theta.v, beta.p, n.ev.v[x], Ht[x,], T1, T2, M0, bdy, crsobj),
+    mc.cores = ncore)
+  # bind the data.frame in the list and return
+  sample.pts <- bind_rows(sample.list)    
+  sample.pts
+}
+
+
+
+## function to place n.ev events in space according to a given intensity
+# mandatory input : --> loglambda : value of the log-intensity calculated at the mesh nodes
+#                 : --> bdy : area in which the points has to be extracted
+#                 : --> mesh : mesh of the area 
+#                 : --> n.ev : number of events to be placed
+#                 : --> crsobj : CRS object
+
+# output : SpatialPoints - set of n.ev points from a point process with generic intensity lambda(s) 
+
+# notes : its a thinning algorithm (we generate many points and retain them with certain probability). 
+#         so the algorithm may be slow or provide undesired results if :
+#                                 a) wide region with small regions of high intensity
+#                                 b) mesh do not represents well changes in the intensity
+
+
+point_sampler <- function(loglambda, bdy, mesh, n.ev, crsobj = NULL){
+  # maximum value of loglambda calculated at the mesh nodes
+  loglambda_max <- max(loglambda)
+  
+  ## Initialize output
+  samp.points <- SpatialPoints(data.frame(x = 0, y = 0))
+  samp.points <- samp.points[-1,]
+  if(!is.null(crsobj)){
+    proj4string(samp.points) <- crsobj}
+  
+  # Initialize number of events
+  num <- 0
+  ## Until we have retained at least n.ev events
+  counter.iter <- 0
+  while (num < n.ev){
+    ## number of points to sample at a time - might want to adjust depending on retain rate.
+    n.points = min(10000*exp(counter.iter), 500000)
+    
+    # place events at random in bdy
+    points <- spsample(bdy, n.points, "random")
+    ## transform to wgs84 long/lat
+    if(!is.null(crsobj)){pts <- spTransform(points, crsobj)}
+    else{pts <- points}
+    
+    ## calculate the value of loglambda at the extracted points projecting the values of loglambda at the mesh nodes
+    proj <- INLA::inla.mesh.project(mesh, pts)
+    # ratio between lambda at the extracted point and the max at the mesh nodes 
+    lambda_ratio <- exp(as.vector(proj$A %*% loglambda) - loglambda_max)
+    # keep with probability lambda_ratio
+    keep <- proj$ok & (runif(n.points) <= lambda_ratio)
+    kept <- pts[keep]
+    # if we retain at least a point
+    if(length(kept) > 0){
+      samp.points <- rbind(samp.points, kept)
+      num <- length(samp.points)
+      counter.iter = counter.iter + 1
+    }
+    else{
+      #print('no retained')
+    }
+  }
+  
+  #if we retain too many points, we select n.ev events at random
+  kp <- sample(seq(1, length(samp.points), by=1), n.ev, replace=FALSE)
+  samp.points <- samp.points[kp,]
+  
+  return(samp.points)
+}
+
+
+
+# function to sample from an ETAS process
+# mandatory inputs : --> theta.v --> parameters vector
+#                  : --> beta.p --> parameter of the GR law for the magnitude
+#                  : --> n.ev : number of aftershocks to be generated
+#                  : --> Ht: known observations (see notes) 
+#                  : --> Sigma: 2x2 covariance matrix for space-triggering function
+#                  : --> M0 : completeness magnitude
+#                  : --> bdy : area in which events have to be placed
+#                  : --> crsobj : CRS object to project the locations
+#                  : --> bk.field.list : information for spatially varying background (see notes)
+
+# output : list of data.frames : 
+#                       each data.frame is a generation of observations from an Hawkes process with intensity
+#                       lambda(t,x,m) = pi(m)*(exp(theta1) + exp(theta2)*sum_{ti < t} gm(mi)*gt(t-ti)*gs(s-si))
+#                       where pi(m) = beta.p*exp(-beta.p*(m - M0))
+#                       columns are: time ("ts"), location ("x","y"), magnitude ("mags"), generation ("gen")
+#                                    gen is such that 0 : generated from known events
+#                                                     1 : background events
+#                                                     2,..j.. : j-th generation, aftershocks of (j-1)-th gen 
+
+# notes: Ht may be observations before T1 as well as observations in (T1, T2)
+#      : bk.field.list has to be a list with an element called "loglambda" with the logairthm of the 
+#        normalized background intensity field and an element called "mesh" containing the mesh.
+#        Notice that loglambda is used only to place events in space, while the number of events is determined
+#        by theta.v[1] solely.
+
+sample.ETAS <- function(theta.v, beta.p, T1, T2, M0, bdy, crsobj, Ht = NULL, ncore = 2, 
+                        bk.field.list = NULL){
+  # if the upper extreme greater than lower
+  if(T2 < T1){
+    stop('Error - right-end of time interval greater than left-end')
+  }
+  # background number of events (area calculated in squared km)
+  n.bkg <- rpois(1, exp(theta.v[1])*(T2 - T1)*(area(bdy)/1000000))
+  #print(n.bkg)
+  # if no background events are generated initialize an empty data.frame
+  if(n.bkg == 0){
+    bkg.df <- data.frame(x = 1, y = 1, ts = 1, mags = 1)
+    bkg.df <- bkg.df[-1,]
+  }
+  else{
+    # sample bkg events
+    # if no bk.field.list element is passed it assumes uniform background rate
+    if(is.null(bk.field.list)){
+      bkg.locs <- spsample(bdy, n.bkg, 'random', iter = 10)
+      proj4string(bkg.locs) <- crsobj
+      bkg.locs <- spTransform(bkg.locs, crsobj)
+      bkg.df <- data.frame(x = bkg.locs@coords[,1], 
+                           y = bkg.locs@coords[,2], 
+                           ts = runif(n.bkg, T1, T2), 
+                           mags = rexp(n.bkg, beta.p) + M0, 
+                           gen = 1)
+    }
+    # otherwise it samples using the information provided
+    else{
+      bkg.locs <- point_sampler(bk.field.list$loglambda, 
+                                bdy, bk.field.list$mesh, n.bkg, crsobj)
+      
+      bkg.df <- data.frame(x = bkg.locs@coords[,1], 
+                           y = bkg.locs@coords[,2], 
+                           ts = runif(n.bkg, T1, T2), 
+                           mags = rexp(n.bkg, beta.p) + M0, 
+                           gen = 1)
+    }
+    }
+    
+  # if known events are provided
+  if(!is.null(Ht)){
+    # sample a generation from the known events
+    gen.from.past <- sample.generation(theta.v, beta.p, Ht, T1, T2, M0, bdy, crsobj, ncore)
+    # if at least an aftershock is produced
+    if(nrow(gen.from.past) > 0){
+      # set generation
+      gen.from.past$gen = 0
+      # Merge first generation and background events
+      Gen.list <- list(rbind(gen.from.past, bkg.df))  
+    }
+    else{
+      Gen.list <- list(bkg.df)
+    }
+    
+  }
+  else{
+    Gen.list <- list(bkg.df)
+  }
+  # stop if we have no background events and no events generated from known observations
+  if(nrow(Gen.list[[1]]) == 0){
+    #print(exp(theta.v[1])*(T2 - T1)*(area(bdy)/1000000))
+    #stop('No events generated - increase theta1')
+    return(Gen.list)
+  }
+  
+  # initialize flag and gen counter
+  flag = TRUE
+  gen = 1
+  # this goes until the condition inside the loop is met
+  while(flag){
+    # set parents
+    parents <- Gen.list[[gen]]
+    # generate aftershocks
+    triggered <- sample.generation(theta.v, beta.p, parents, T1, T2, M0, bdy, crsobj, ncore)
+    #print(nrow(triggered))
+    # stop the loop if there are no more aftershocks
+    if(nrow(triggered) == 0){
+      flag = FALSE}
+    else{
+      # set generations
+      triggered$gen = gen + 1
+      # store new generation
+      Gen.list[[gen + 1]] = triggered
+      # update generation counter
+      gen = gen + 1
+    }
+  }
+  Gen.list
+}
+
+
+# function to calculate the value of the background field in a given location
+# mandatory inputs : --> loc : location at which evaluate the field
+#                  : --> Ht : data.frame of observations to determine the field
+#                  : --> Sigma.p : 2x2 covariance function for the Gaussian kernel
+# optional inputs : --> ncore: number of cores to be used
+
+# output : numeric - value of the background field. For each row in Ht we take a Gaussian kernel with mean
+#                    given by the location of the event and covrariance matrix Sigma.p*m where m is the 
+#                    magnitude of the event
+
+# notes : Ht has to be a data.frame with at least one column for the magnitudes (called "mags") and 
+#         two columns for the locations (called "x", "y").
+
+background.field <- function(loc, Ht, Sigma.p, ncore = 5){
+  
+  Ht.locs <- cbind(Ht$x, Ht$y)
+  Ht.mags <- Ht$mags
+  
+  n.history <- nrow(Ht)
+  aa <- unlist(mclapply(1:nrow(Ht.locs), function(idx) 
+    mahalanobis(loc, Ht.locs[idx,], Sigma.p), mc.cores = 5))
+  
+  idx.xs <- which(aa < 20)
+  
+  sum(unlist(mclapply(idx.xs, function(idx) 
+    dmvnorm(loc, mean = Ht.locs[idx,], sigma = Sigma.p*Ht.mags[idx]), mc.cores = ncore)))
+}
+
+
+
+
+
+
+# function to generate a sample and extract the number of observations
+# mandatory inputs : --> theta.v --> parameters vector
+#                  : --> beta.p --> parameter of the GR law for the magnitude
+#                  : --> n.ev : number of aftershocks to be generated
+#                  : --> Ht: known observations (see notes) 
+#                  : --> Sigma: 2x2 covariance matrix for space-triggering function
+#                  : --> M0 : completeness magnitude
+#                  : --> bdy : area in which events have to be placed
+#                  : --> crsobj : CRS object to project the locations
+
+# output : numeric - number of observations in a generated sample.
+
+fore.number <- function(theta.v, beta.p, T1, T2, M0, bdy, crsobj, Ht, ncore = 5, bk.field.list){
+  ss <- sample.ETAS(theta.v, beta.p, T1, T2, M0, bdy, crsobj, Ht, ncore, bk.field.list)
+  ss1 <- bind_rows(ss)
+  sum(ss1$ts >= T1 & ss1$ts < T2)
+}
+
+
+
+
+run.fore.experiment <- function(theta.v, beta.p, M0, bdy, crsobj, t.breaks, testing.data,
+                                bk.field.list, ncore = 5, nsim = 100){
+  
+  store.res <- matrix(NA, ncol = 4, nrow = length(t.breaks) - 1)
+  print('Completed percentage : ')
+  s = Sys.time()
+  for(i in 1:(length(t.breaks) - 1)){
+    if(sum(ss1$ts < t.breaks[i]) == 0){
+      Ht = NULL
+    }
+    else{
+      Ht <- testing.data[testing.data$ts < t.breaks[i],]
+    }
+    n.sim <- sapply(1:nsim, function(x) 
+      fore.number(theta.v, beta.p, T1 = t.breaks[i], T2 = t.breaks[i+1], 
+                  M0, bdy, crsobj, Ht = Ht, ncore, bk.field.list))
+    
+    past.data <- testing.data[testing.data$ts < t.breaks[i+1],]
+    
+    store.res[i, ] <- c(quantile(n.sim, 0.025), # lower quantile simulated
+                        quantile(n.sim, 0.5), # median simulated
+                        quantile(n.sim, 0.975), # higher quantile simulated
+                        sum(testing.data$ts >= t.breaks[i] & testing.data$ts < t.breaks[i + 1])) # observed 
+    
+    print(i/(length(t.breaks) - 1))
+  } 
+  print(Sys.time() - s)
+  store.res  
+}
+
+
+
+
+
+
+
+

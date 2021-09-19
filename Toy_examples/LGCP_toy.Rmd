@@ -1,0 +1,250 @@
+---
+title: "LGCP - Toy Example"
+author: "Francesco Serafini"
+date: "19/09/2021"
+output: pdf_document
+---
+
+```{r, echo = FALSE}
+knitr::opts_chunk$set(eval = TRUE)
+```
+
+# Two ways of representing Point Patterns
+
+Given a set of observations $\{\mathbf y_i: \mathbf y_i \in \mathcal W, i=1,...,n\}$ of a point process in a region $\mathcal W$ we can model this data in two ways: as a point process model or as a poisson counts model. The point process log-likelihood for this data is given by
+
+$$
+\mathcal L_{PP} = - \int_{\mathcal W} \lambda(\mathbf s)d\mathbf s + \sum_{i=1}^n \log \lambda(\mathbf y_i)
+$$
+
+Where $\lambda(\cdot)$ is the intensity of the point process. The intensity calculated in a point $\mathbf y$ is equal to the limit of ratio between the probability of observing at least one event in a ball around $\mathbf y$ and the volume of this ball. The limit sends the volume of the ball to zero. Here, the data is composed by the actual observations $\mathbf y_1,...,\mathbf y_n$
+
+The second way (Poisson counts) relies on a discretization of the region $\mathcal W$. Suppose that the region $\mathcal W$ is divided in $N$ bins $b_1,...,b_K$ such that $\cup b_k = \mathcal W$ and $b_k \cap b_j = \emptyset$ for any $k \neq j$. For each bin $b_k$, $N_k$ represents the number of observed points in $b_k$. Also, for each bin $b_k$, $\lambda_k$ represents the expected number of points by the model in $b_k$. The log-likelihood for the Poisson counts model is given by
+
+$$
+\begin{aligned}
+\mathcal L_{PC} & = \sum_{k = 1}^K - \lambda _k + \log(\lambda_k)N_k \\ \\ 
+& = - \sum_{k = 1}^K\lambda _k + \sum_{k = 1}^K \log(\lambda_k)N_k
+\end{aligned}
+$$
+
+We have ignored $N_k!$ because it is a known quantity. Here, the data is composed by the Poisson counts per bin $N_1,...,N_K$.
+
+
+# What INLA sees
+
+INLA is capable of dealing with Poisson models (as the Poisson counts model) but is not capable of dealing with Point process models directly. Thus, we need to approximate the Point Process likelihood with a Poisson counts likelihood. In other words we need $\mathcal L_{PP} \approx \mathcal L_{PC}$. In order to do that, we need,
+
+$$
+\int_{\mathcal W} \lambda(\mathbf s)d\mathbf s \approx  \sum_{k = 1}^K\lambda _k \quad \quad  \sum_{i=1}^n \log \lambda(\mathbf y_i) \approx \sum_{k = 1}^K \log(\lambda_k)N_k
+$$
+
+The first bit regards the total number of points expected in the region $\mathcal W$. In fact, the integral of the intensity represents the expected value of the number of points in $\mathcal W$ and the sum of the expected number of points in each bin represents exactly the same thing. The sum of the intensity calculated at the observed points is a measure of "how likely" is to observe the present point patterns while the second summation is a measure of "how likely" is to observe the present counts. 
+
+We can reformulate the Poisson counts model in a way that is more convenient to approximate the Point Process model. Suppose that the intensity, in each bin $b_k$, is contant and equal to $\lambda(\mathbf p_k)$, where $\mathbf p_k$ is the centroid of the bin $b_k$. Suppose, also, that the bin $b_k$ has volume (in 3D, area in 2D, length in 1D) $E_k$. $E_k$ is also know as exposure of the bin $b_k$. In this case, the expected number of points in the bin $b_k$ is given by the product between $\lambda(\mathbf p_k)$ and $E_k$:
+
+$$
+\lambda_k = \lambda(\mathbf p_k)E_k
+$$
+
+The likelihood of the Poisson Count model in this case becomes
+
+$$
+\mathcal L_{PC} = - \sum_{k = 1}^K\lambda(\mathbf p_k)E_k + \sum_{k = 1}^K \log(\lambda(\mathbf p_k))N_k
+$$
+
+Where we have ignored the term $\log(E_k)N_k$ in the second summation because known quantity. So, we need that
+
+$$
+\int_{\mathcal W} \lambda(\mathbf s)d\mathbf s \approx  \sum_{k = 1}^K\lambda(\mathbf p_k)E_k \quad \quad \sum_{i=1}^n \log \lambda(\mathbf y_i) \approx \sum_{k = 1}^K \log(\lambda(\mathbf p_k))N_k 
+$$
+
+Essentially, we are approximating the continuos function $\lambda(\cdot)$ with a piecewise-constant version for which $\forall \mathbf y \in b_k,\, \lambda(\mathbf y) = \lambda(\mathbf p_k)$. The first bit know is just a discrete approximation of the integral. The intensity function $\lambda(\cdot)$ is approximated considering it, in each bin $b_k$, as contant and equal to the value at $\lambda(\mathbf p_k)$. In the second bit, the intensity in a point $\lambda(\mathbf y_i)$ is approximated by $\lambda(\mathbf p_k)$ where $\mathbf p_k$ is the centroid of the bin containing the observation $\mathbf y_i$.
+
+# Approximating the Integral
+
+In order to provide a better approximation of the integral of the intensity is convenient to base the approximation on a tringulation (or mesh) of the region $\mathcal W$. Let's call $\mathbf s_1,...,\mathbf s_J$ the mesh points with weights $w_1,...,w_J$. Then, the integral is approximated by:
+
+$$
+\int_{\mathcal W} \lambda(\mathbf s)d\mathbf s \approx  \sum_{j = 1}^J\lambda(\mathbf s_j)w_j
+$$
+Essentially is like considering a Poisson counts model with $J$ bins defined by the triangulation. Here, $\mathbf s_j$ is the centroid of the bin $b_j$ and $w_j$ is its exposure. The likelihood of such model would be 
+
+$$
+\mathcal L_{int} = - \sum_{j = 1}^J\lambda(\mathbf s_j)w_j + \sum_{j = 1}^J \log(\lambda(\mathbf s_j))N_j
+$$
+Considering $\forall j, \,N_j = 0$ we have that 
+
+$$
+\mathcal L_{int} = - \sum_{j = 1}^J\lambda(\mathbf s_j)w_j 
+$$
+
+# Approximating the Summation
+
+To approximate the summation is convenient to consider as centroids the observed points $\mathbf y_1,...,\mathbf y_n$. In this way the summation is approximated by:
+
+$$
+\sum_{i=1}^n \log \lambda(\mathbf y_i) \approx \sum_{i = 1}^n \log(\lambda(\mathbf y_i))N_i
+$$
+
+The associated Poisson counts model log-likelihood is given by:
+
+$$
+\mathcal L_{sum} = - \sum_{i = 1}^n\lambda(\mathbf y_i)w_i + \sum_{i = 1}^n \log(\lambda(\mathbf y_i))N_i
+$$
+Considering $\forall i, \, w_i = 0, N_i = 1$ we have that
+
+$$
+\mathcal L_{sum} = \sum_{i = 1}^n \log(\lambda(\mathbf y_i))
+$$
+
+# Putting all together
+  
+  In order to provide a reliable approximation we need to put together the approximation of the integral and the approximation of the summation in a single Poisson counts model. Using the terminology used before, we need to specify a set of centroids $\mathbf p_1,...,\mathbf p_P$ representing the bins, a vector of exposures $E_1,...,E_P$ representing the "size" of the bins and a vector of counts $N_1,...,N_P$ representing the number of observed events in each bin.
+
+The dimension $P$ is given by the sum of the number of mesh points $J$ and the observations $n$, so $P = J + n$. We can use the specifications used in the previous two sections, the three vectors are specified as follows:
+
+$$
+\text{centroids} = 
+\begin{pmatrix}
+\mathbf s_1 \\
+\vdots \\
+\mathbf s_J \\
+\mathbf y_1 \\
+\vdots \\
+\mathbf y_n
+\end{pmatrix}
+\quad
+\text{exposures} = 
+\begin{pmatrix}
+w_1 \\
+\vdots \\
+w_J \\
+0 \\
+\vdots \\
+0
+\end{pmatrix}
+\quad
+\text{counts} = 
+\begin{pmatrix}
+0 \\
+\vdots \\
+0 \\
+1 \\
+\vdots \\
+1
+\end{pmatrix}
+$$
+
+The resulting Poisson counts model has log-likelihood given by 
+
+$$
+\begin{aligned}
+\mathcal L_{PC} &= \mathcal L_{int} + \mathcal L_{sum} \\ \\ 
+&= - \sum_{j=1}^J \lambda(\mathbf s_j)w_j + \sum_{i = 1}^n\log(\lambda(\mathbf y_i)) 
+\end{aligned}
+$$
+
+Therefore, if $\lambda(\cdot)$ does not require another approximation, the difference between the log-likelihood of the Point Process model and the Poisson counts model depends only on how well we approximate the integral.
+
+## Example
+
+Here, we give a very simple example. We fit a model using the $\texttt{lgcp}$ Inlabru function and we fit the corresponding Poisson model using the $\texttt{bru}$ function. The results will be exactly the same.
+
+For this example, $\mathbf y = (x,y) \in \mathbb R^2$ and $\mathcal W = (0,1)\times(0,1)$. The log-intensity is given by:
+
+$$
+\log \lambda(x,y) = \theta(\cos(x) - \sin(y - 1))
+$$
+
+The only parameter of the model is $\theta = 4$ and the log-intensity is a linear function of the spatially varying covariate $\cos(x) - \sin(y - 1)$.
+
+```{r, echo = F, message=F,warning=F}
+library(ggplot2)
+library(inlabru)
+library(INLA)
+library(viridis)
+library(matrixStats)
+```
+
+
+```{r}
+# create sequences for plotting 
+xx <- seq(0,1,length.out = 100)
+yy <- seq(0,1,length.out = 100)
+pp <- expand.grid(xx, yy)
+# fix theta
+theta <- 4
+# calculate log-intensity
+pp$log.lambda <- theta*(cos(pp[,1]) - sin(pp[,2]-1))
+colnames(pp) <- c('x', 'y', 'log.lambda')
+# plot
+ggplot(pp, aes(x = x, y = y, fill = log.lambda)) + geom_tile() + scale_fill_viridis()
+```
+
+The first step is to build a mesh and to generate a sample. We have generated a sample considering containing 345 observations.
+
+```{r}
+
+# create a boundary box to build a mesh 
+b.coords <- cbind(c(0, 0, 1, 1, 0),
+                  c(0, 1, 1, 0, 0))
+poly1 <- Polygon(b.coords)
+poly2 <- Polygons(list(poly1), 'a')
+bound <- SpatialPolygons(list(poly2))
+
+# build a mesh
+mesh = inla.mesh.2d(boundary = bound, max.edge = c(0.05, 0.2))
+# calculate the log-intensity at the mesh location
+mesh.logl <- theta*(cos(mesh$loc[,1]) - sin(mesh$loc[,2] - 1))
+# sample from the corresponding point process model
+set.seed(12)
+sample1 <- sample.lgcp(mesh, mesh.logl, samplers = bound)
+# plot
+ggplot(pp, aes(x = x, y = y, fill = log.lambda)) + geom_tile() + 
+  geom_point(data = data.frame(sample1@coords),
+             mapping = aes(x = x, y = y, fill = NULL)) + 
+  scale_fill_viridis()
+
+```
+
+Now that we have our observed sample we can fit the models and check that they produce exactly the same results.
+
+```{r}
+# LGCP model
+# components is the same for both models 
+cmp <- ~ -1 + thetap(1, model = 'linear')
+
+# formula for lgcp
+frm.lgcp <- coordinates ~ thetap*(cos(x) - sin(y - 1))
+
+# fit lgcp
+fit.lgcp <- lgcp(components = cmp,
+                 formula = frm.lgcp,
+                 data = sample1,
+                 domain = list(coordinates = mesh))
+
+# calculate weights associated with mesh points
+ips <- ipoints(domain = mesh)
+
+# build the dataset
+data.pois <- data.frame(
+  # x,y location (centroids)
+  xx = c(mesh$loc[,1], sample1@coords[,1]),
+  yy = c(mesh$loc[,2], sample1@coords[,2]),
+  # exposures
+  exposures = c(ips$weight[,1], rep(0, length(sample1))),
+  # observed counts
+  obs.c = c(rep(0, mesh$n), rep(1, length(sample1))))
+
+# formula poisson counts model
+frm.pois <- obs.c ~ thetap*(cos(xx) - sin(yy - 1))
+# poisson fit
+fit.pois <- bru(components = cmp,
+                formula = frm.pois,
+                data = data.pois,
+                family = 'poisson',
+                options = list(E = data.pois$exposures))
+# check the results
+rbind(fit.lgcp$summary.fixed, fit.pois$summary.fixed)
+```

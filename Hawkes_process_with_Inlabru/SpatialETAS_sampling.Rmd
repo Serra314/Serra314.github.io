@@ -1,0 +1,452 @@
+---
+title: "Spatio-Temporal ETAS model sampling"
+author: "Francesco Serafini"
+date: "28/07/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, eval = FALSE, warnings = FALSE, message = FALSE)
+source('spatial_ETAS_utils.R')
+```
+
+# Target Model 
+
+Hawkes process model with conditional intensity at time $t$ and location $\textbf s$ given the history of the process at time $t, \, \mathcal H_t$, is given by:
+
+$$
+\lambda(t, \textbf s | \mathcal H_t) = \mu(\textbf s) + K\sum_{i: t_i < t} g_m(m_i)g_t(t - t_i)g_s(\textbf s - \textbf s_i)
+$$
+
+with expected number of point in a region $A \times [T_1, T_2]$
+
+$$
+\begin{aligned}
+\Lambda(T_1, T_2, A) & = \int_A \int_{T_1}^{T_2} \lambda(t, \textbf s | \mathcal H_t)dt d\textbf s \\ \\ 
+& = (T_2 - T_1)\int_A \mu(\textbf s)d\textbf s + K \sum_{i} g_m(m_i)\int_A \int_{max(t_i, T_1)}^{T_2} g_t(t - t_i) g_s(|\textbf s - \textbf s_i|)dtd\textbf s \\ \\ 
+& = (T_2 - T_1)\int_A \mu(\textbf s)d\textbf s + K \sum_{i} g_m(m_i)I_t(t_i, T_1, T_2) I_s(\textbf s_i, A)
+\end{aligned}
+$$
+
+where the summation is over $i : t_i \in H_{T_2}$ the history of the process up to time $T_2$ and 
+
+$$
+I_t(t_i, T_1, T_2) = \int_{max(t_i, T_1)}^{T_2} g_t(t - t_i)dt
+$$
+
+$$
+I_s(s_i, A) = \int_A g_s(\textbf s - \textbf s_i)d\textbf s
+$$
+
+The log-likelihood is given by
+
+$$
+\mathcal L = - \left( (T_2 - T_1)\int_A \mu(\textbf s)d\textbf s + K \sum_{i} g_m(m_i)I_t(t_i, T_1, T_2) I_s(\textbf s_i, A) \right) + \sum_i \log \left( \mu(\textbf s_i) + K\sum_{j: t_j < t_i} g_m(m_j)g_t(t_i - t_j)g_s(|\textbf s_i - \textbf s_j |) \right)
+$$
+
+In our case
+
+$$
+\mu(\textbf s) = \exp(\theta_1) f(\textbf s)
+$$
+
+We assume $f(\textbf s)$ is given or estimated independently from others parameters.
+
+
+$$
+K = \exp(\theta_2)
+$$
+
+Considering a magnitude of completeness $M_0$, we consider a specific form for each triggering function. The first, $g_m(\cdot)$ represents the influence of the magnitude of past events on the present. We suppose that events with higher magnitude have a stronger effect and, therefore, we consider $\exp\theta_3$ which is a non-negative quantity.
+
+$$
+g_m(m) = \exp\{\exp(\theta_3)(m - M_0)\} 
+$$
+
+```{r, eval = TRUE, fig.cap='example of $g_m(m)$ considering different $\\theta_3$ and $M_0 = 2.5$', fig.height=4}
+M0 <- 2.5
+mm <- seq(M0 + 0.1, 9, by = 0.1)
+
+theta3.seq <- seq(-0.5, 0, by = 0.1)
+pl.left <- toplot.gm(theta3.seq, mm, M0)
+
+theta3.seq <- seq(0, 0.5, by = 0.1)
+pl.right <- toplot.gm(theta3.seq, mm, M0)
+
+multiplot(pl.left, pl.right, cols = 2)
+```
+
+
+The second function, $g_t(\cdot)$ represents the temporal decay of the influence of a past event on the present. It is given by the Omori's law and has two parameters $\theta_4$ and $\theta_5$
+
+$$
+g_t(t - t_i) = \frac{1}{(t - t_i + \exp\theta_4)^{1 + \exp \theta_5}}
+$$
+
+```{r, eval = TRUE, fig.cap='example of $g_t(t - t_i)$ considering different combinations of $\\theta_4$ and $\\theta_5$ assuming $t_i = 0$', fig.height=4}
+
+tt <- seq(1e-5, 5 + 1e-5, by = 0.1)
+ht <- 0
+
+th4.seq <- seq(-3, -1, by = 0.5)
+th5.seq <- seq(-1, 1, by = 0.5)
+
+th.gr <- expand.grid(th4.seq, th5.seq)
+gt.list <- lapply(1:nrow(th.gr), function(i) 
+  data.frame(t = tt,
+             gt = g.t(tt, th.gr[i, 1], th.gr[i, 2], ht),
+             params = paste(th.gr[i,1], th.gr[i,2], sep = '|'),
+             th4 = th.gr[i,1], th5 = th.gr[i,2]))
+
+gt.df <- bind_rows(gt.list)
+
+pl.left <- 
+  ggplot(gt.df[gt.df$th4 == -3,], aes(x = t, y = gt, color = params, linetype = params)) + 
+  geom_line() + ylim(0, 250)
+
+pl.right <- 
+  ggplot(gt.df[gt.df$th5 == 0.5,], aes(x = t, y = gt, color = params, linetype = params)) + 
+  geom_line()+ ylim(0, 250)
+
+multiplot(pl.left, pl.right, cols = 2)
+```
+
+
+$$
+g_s(\textbf s - \textbf s_i) = \frac{1}{2\pi}(\text{det}\Sigma)^{-1/2}\exp\{-(\textbf s - \textbf s_i)^T \Sigma^{-1} (\textbf s - \textbf s_i)\}
+$$
+
+Where $\Sigma$ is a $2 \times 2$ covariance matrix. It has to be symmetric so, in this case, we need to specify three elements which will determine the shape of the triggering function. The location is governed by the mean which, in this case, is considered to be the observed point $\textbf s_i$. 
+
+```{r, eval = TRUE, fig.cap="example of $g_s( \\mathbf s - \\mathbf s_i)$ considering different covariance matrices $\\Sigma$ and assuming $\\mathbf s_i = (0.5, 0.5)$", fig.height=4}
+
+Mu = rep(0.5, 2)
+x.seq <- seq(0,1,by = 0.02)
+y.seq <- seq(0,1,by = 0.02)
+
+# indipendence
+Sigma = matrix(c(1,0,0, 1), byrow = T, ncol = 2)
+plotgs.1 <- toplot.gs(Mu, Sigma, x.seq, y.seq) + theme(legend.position = 'none')
+
+# negative corr
+Sigma = matrix(c(1,-0.5,-0.5, 1), byrow = T, ncol = 2)
+plotgs.2 <- toplot.gs(Mu, Sigma, x.seq, y.seq) + theme(legend.position = 'none')
+
+# positive corr
+Sigma = matrix(c(1, 0.5, 0.5, 1), byrow = T, ncol = 2)
+plotgs.3 <- toplot.gs(Mu, Sigma, x.seq, y.seq) + theme(legend.position = 'none')
+
+multiplot(plotgs.1, plotgs.2, plotgs.3, cols = 3)
+```
+
+
+Given the above specification of the triggering functions, we need to integrate them to retrieve the expected number of points in a given region of the domain. 
+
+For the time triggering function: 
+
+$$
+\begin{aligned}
+I_t(t_i, T_1, T_2) & = \int_{max(t_i, T_1)}^{T_2} g_t(t - t_i)dt \\ \\
+& = \int_{max(t_i, T_1)}^{T_2} (t - t_i + \exp\theta_4)^{-1 -\exp\theta_5} dt \\ \\
+& = \frac{(\max(0, T_1 - t_i) + \exp\theta_4)^{-\exp\theta_5} - (T_2 - t_i + \exp\theta_4)^{-\exp\theta_5}}{\exp \theta_5} 
+\end{aligned}
+$$
+
+For the spatial triggering function, being a multivariate Gaussian density function:
+
+$$
+\begin{aligned}
+I_g(A) & = \int_A g_s(\textbf s - \textbf s_i)d\textbf s \\ \\ 
+& = \Pr(\textbf Z \in A)
+\end{aligned}
+$$
+
+Where $\textbf Z \sim N(\textbf s_i, \Sigma)$ it's a multivariate Gaussian distribution with mean given by the observed location $\textbf s_i$ and covariance matrix $\Sigma$.
+
+
+# ETAS sampling
+
+Here, a small example of two sequences using paramers $\boldsymbol \theta = (-4.60, -2.99, 0.095, -4.60, -2.30, -6.21, -6.21, -6.26)$ which correspond to parameters $\mu = 1e-2, K = 0.05, \alpha = 1.1, c = 1e-2, p = 1.1, \sigma^2_x = \sigma^2_y 0.002, \sigma_{xy} = 0.0019$. The points are generated in the square box $(0,1) \times (0,1)$ and time comprised between $0$ and $1$. The magnitude follow a GR law with parameter $\beta = 2.3$ which correspond to $b = \beta/\log(10) = 0.99$. Two spatial triggering functions are considered. One is isotropic, which correspond to $\sigma_{xy} = 0$ and the other one is not isotropic and has $\sigma_{xy} = 0.0019$. 
+
+The algorithm to sample from an ETAS model in the time interval $T_1, T_2$ and space region $W$ works as follows:
+
+1. If we have knowledge of past events, generate aftershocks of all known past events $\mathbf x_0 = \{(t_{0j}, m_{0j}, x_{0j}, y_{0j}), j = 1,...,J_0\}$ (using \texttt{sample.generation()})
+
+2. Generate background rate events $\mathbf x_1 = \{(t_{1j}, m_{1j}, x_{1j}, y_{1j}), j = 1,...,J_1\}$ (using \texttt{points_sampler()})
+
+3. Merge $\mathbf x_0$ and $\mathbf x_1$ in $parents = \mathbf x_0 \cup \mathbf x_1$
+
+4. Set $i = 2$, generate aftershocks of all events in $parents$, namely $\mathbf x_i$ (using \texttt{sample.generation()})
+
+5. Set $parents = \mathbf x_i$ and $i = i+1$ and repear point 4. Stop if there no generate aftershocks.
+
+
+```{r, eval = TRUE}
+# create a polygon representing the area of interest 
+x_coords <- c(0,1,1,0,0)
+y_coords <- c(0,0,1,1,0)
+poly1 <- sp::Polygon(cbind(x_coords,y_coords))
+bdy <- sp::Polygons(list(poly1), ID = "A")
+bdy <- sp::SpatialPolygons(list(bdy))
+crswgs <- CRS("+proj=longlat +datum=WGS84")
+proj4string(bdy) <- crswgs
+bdy <- spTransform(bdy, crswgs)
+
+# set value of the parameters
+theta.v <- log(c(1e-2, 0.05, 1.1, 1e-2, 0.1, 0.002, 0.002, 0.0019)) 
+Sigma <- matrix(exp(c(theta.v[6], theta.v[8], theta.v[8], theta.v[7])), byrow = T, ncol = 2)
+
+# plot example of spatial triggering
+plot.sigma1 <- toplot.gs(c(0.5, 0.5), Sigma, x.seq, y.seq) + theme(legend.position = 'none')
+
+# sample
+ss <- sample.ETAS(theta.v, beta.p = 2.3, T1 = 0, T2 = 1, M0 = 2.5, 
+                  bdy = bdy, crsobj = crswgs, Ht = NULL)
+# store in data.frame
+ss1 <- bind_rows(ss)
+ss1$mags.class <- cut(ss1$mags, c(2.5, 3.5, 4.5, 5.5, 6.5, 9))
+
+# plot
+plot.sample1 <- ggplot() + gg(bdy) + 
+  geom_point(data = ss1, aes(x = x, y = y, shape = mags.class, fill = gen, size = mags)) + 
+  scale_shape_manual(values = c(20:(19+length(unique(ss1$gen))))) +
+  scale_size_continuous(guide = FALSE)+ theme(legend.position = c(0.925, 0.55),
+                                               legend.key.size = unit(0.35, 'cm')) +
+  scale_fill_viridis()
+
+```
+
+```{r, eval = TRUE, fig.height=5, fig.cap="Two sample from two ETAS models with different spatial triggering functions characterized by $\\sigma_{xy} = 0.0019$ (left) and $\\sigma_{xy} = 0$ (right)" }
+Sigma2 <- Sigma
+Sigma2[1,2] <- 0
+Sigma2[2,1] <- 0
+plot.sigma2 <- toplot.gs(c(0.5, 0.5), Sigma2, x.seq, y.seq) + theme(legend.position = 'none')
+
+theta.v2 <- theta.v
+theta.v2[8] <- log(0)
+ss. <- sample.ETAS(theta.v2, beta.p = 2.3, T1 = 0, T2 = 1, M0 = 2.5, 
+                  bdy = bdy, crsobj = crswgs, Ht = NULL)
+ss2 <- bind_rows(ss.)
+ss2$mags.class <- cut(ss2$mags, c(2.5, 3.5, 4.5, 5.5, 6.5, 9))
+plot.sample2 <- ggplot() + gg(bdy) + 
+  geom_point(data = ss2, aes(x = x, y = y, fill = gen, shape = mags.class, size = mags)) + 
+  scale_shape_manual(values = c(20:(19+length(unique(ss2$gen))))) +
+  scale_size_continuous(guide = FALSE) + theme(legend.position = c(0.925, 0.55),
+                                               legend.key.size = unit(0.35, 'cm')) +
+  scale_fill_viridis()
+
+multiplot(plot.sigma1, plot.sample1, plot.sigma2, plot.sample2, 
+          layout = matrix(1:4, ncol = 2))
+```
+
+# ITALY
+
+Here, we propose an example using Italy. The area of interest is the italy collection area provided by CSEP (Figure 5). We are going to assume a spatially varying background rate. Background rate determined using $1748$ events from the Horus catalog. The events have occured between 01-01-2000 and 31-12-2020 and have magnitude greater than 3.5, for each event we take an isotropic Gaussian kernel with center at the event and $\sigma^2_y = 0.002m_i$, where $m_i$ is the magnitude of the event. The backround rate is determined by the sum of the Gaussian kernels. The sum is normalized to integrate to one over the domain, in this way the number of points generated is controlled by $\mu = \exp \theta_1$ solely. Figure 5 shows the estimated background rate and a sample of 100 points placed in space accordingly. 
+
+```{r, eval = TRUE, fig.cap='Italy collection area', fig.height=5}
+italy.collection <- read.delim('ITALY_BDY/italy.collection.nodes.dat', sep = '', header = FALSE)
+colnames(italy.collection) <- c('x', 'y')
+coordinates(italy.collection) <- ~ x + y
+proj4string(italy.collection) <- crswgs
+italy.collection <- spTransform(italy.collection, crswgs)
+
+italy.grid <- SpatialPixelsDataFrame(italy.collection, proj4string = crswgs,
+                            data = data.frame(id = 1:11207))
+italy.contour <- adehabitatMA::getcontour(italy.grid)
+
+```
+
+
+```{r}
+# use this later on to adjust integral calculations
+ht <- data.frame(x = 15, y = 40)
+coordinates(ht) <- ~ x + y
+proj4string(ht) <- crswgs
+ht <- spTransform(ht, crswgs)
+library(geosphere)
+dist2Line(ht, italy.contour)
+```
+
+```{r, eval = TRUE}
+# build a mesh for sampling non uniformly
+italy.mesh <- inla.mesh.2d(boundary = italy.contour, max.edge = c(0.2, 0.3))
+italy.mesh$crs <- crswgs
+```
+
+```{r, eval = TRUE}
+load('HORUS_Ita_Catalog/italy.horus_2.5_00_20.RData')
+italy.horus_3.5_00_20 <- italy.horus_2.5_00_20 %>%
+  filter(Mw > 3.5) %>%
+  mutate(mags.class = cut(Mw, c(2.5, 4, 5.5, 8)))
+
+italy.app.pts <- italy.horus_3.5_00_20
+coordinates(italy.app.pts) <- ~ Lon + Lat
+proj4string(italy.app.pts) <- crswgs
+italy.app.pts <- spTransform(italy.app.pts, crswgs)
+
+italy.app.collection <- crop(italy.app.pts, italy.contour)
+
+
+italy.horus_3.5_00_20 <- as.data.frame(italy.app.collection)
+library(rnaturalearth)
+library(rnaturalearthdata)
+
+europe <- ne_countries(continent = 'Europe', returnclass = "sf", scale = 'medium')
+
+pl.collection <- ggplot() + geom_sf(data = europe) +
+  gg(italy.contour) +
+  geom_point(data = italy.horus_3.5_00_20[order(italy.horus_3.5_00_20$Mw),], 
+             aes(x = Lon, y = Lat, fill = mags.class, size = Mw/3), shape = 21) + 
+  xlim(italy.contour@bbox[1,]) + 
+  ylim(italy.contour@bbox[2,]) +
+  theme(legend.position = c(0.9, 0.7)) + 
+  scale_size_continuous(guide = NULL)
+
+```
+
+
+```{r}
+# find background for each mesh point
+Sigma.bk <- matrix(c(0.001, 0, 0, 0.001), byrow = T, ncol = 2)
+italy.mesh.df <- data.frame(x = italy.mesh$loc[,1],
+                            y = italy.mesh$loc[,2])
+
+Ht <- data.frame(x = italy.horus_3.5_00_20$Lon, y = italy.horus_3.5_00_20$Lat,
+                 mags = italy.horus_3.5_00_20$Mw)
+
+italy.mesh.df$bk.field <- sapply(1:nrow(italy.mesh.df), function(y) 
+  background.field(italy.mesh$loc[y,1:2], Ht, Sigma.bk))
+
+save(italy.mesh.df, file = 'italy.mesh.df.RData')
+```
+
+
+```{r, eval = TRUE}
+load('HORUS_Ita_Catalog/italy.horus_2.5_00_20.RData')
+load('Generated_data/italy.mesh.df.RData')
+```
+
+```{r, eval = TRUE, fig.height=5, fig.width=2.5}
+# normalize intensity
+ips <- ipoints(italy.mesh)
+integrated.bk <- sum(ips$weight*italy.mesh.df$bk.field)
+italy.mesh.df$bk.field <- italy.mesh.df$bk.field/integrated.bk
+
+# build pixels for plotting
+italy.pixels <- pixels(italy.mesh, nx = 200, ny = 200, mask = italy.contour)
+mm <- inla.mesh.projector(italy.mesh, italy.pixels)
+mm2 <- inla.mesh.project(mm, italy.mesh.df$bk.field)
+italy.pixels$bkfield <- mm2
+
+# plotting
+pl.bk.field <- ggplot() + gg(italy.contour) + geom_sf(data = europe) + 
+  gg(italy.pixels, alpha = 0.8) + 
+  scale_fill_viridis()  +
+  xlim(italy.contour@bbox[1,]) + 
+  ylim(italy.contour@bbox[2,]) + 
+  theme(legend.position = c(0.9, 0.7), 
+        legend.key.size = unit(0.5, 'cm'))
+
+ss <- point_sampler(log(italy.mesh.df$bk.field), italy.contour, italy.mesh, 100, crswgs)
+
+pl.points <- ggplot() + geom_sf(data = europe) + gg(italy.contour)  + 
+  gg(ss) + 
+  scale_fill_viridis()  +
+  xlim(italy.contour@bbox[1,]) + 
+  ylim(italy.contour@bbox[2,])
+```
+
+
+```{r, eval = TRUE, fig.width=6, fig.height=6, fig.cap= 'From left to right: Horus catalog for events between 01-01-2000 to 31-12-2020 with magnitude greater than 3.5; background intensity estimated from the Horus catalog; sample of 100 points placed according to the background intensity'}
+multiplot(pl.collection, pl.bk.field, pl.points,
+          layout = matrix(1:4, byrow = T, ncol = 2))
+```
+
+Then, we assume parameters $\boldsymbol \theta$ equal to the one estimated here \url{https://www.earth-prints.org/bitstream/2122/6419/1/ANNALI_Lombardi_and_Marzocchi_CSEP_ETAS.doc.pdf} which are $\mu = 237 (\text{years}^{-1}), K = 0.011, \alpha = 1.3, c = 0.00004, p = 1.16$. We consider a different space-triggering function with different parametrization. We are going to use as $\Sigma$ the one considered to determine the sample in Figure 4 (left).
+
+
+```{r}
+# italy
+# parameters from here https://www.earth-prints.org/bitstream/2122/6419/1/ANNALI_Lombardi_and_Marzocchi_CSEP_ETAS.doc.pdf
+
+# where M0 = 2.5 - starting Apr 16 2005 - finishing Jun 1 2009 --> 2100 events
+# paramerers refer to 1 year 
+# mu = 237, K = 0.011, p = 1.16, c = 0.00004, alpha = 1.3
+
+theta.v <- log(c(237/(area(italy.contour)/1000000), 0.011, 1.3, 0.00004, 1.16 - 1, 0.002, 0.002, 0.0019))
+
+ss <- sample.ETAS(theta.v, beta.p = 2.3, T1 = 0, T2 = 2, M0 = 2.5, 
+                  bdy = italy.contour, crsobj = crswgs, Ht = NULL, ncore = 5,
+                  bk.field.list = list(loglambda = log(italy.mesh.df$bk.field),
+                                       mesh = italy.mesh))
+
+ss1 <- bind_rows(ss)
+ss1$mags.class <- cut(ss1$mags, c(2.5, 3.5, 4.5, 5.5, 6.5, 9))
+
+save(ss1, file = 'sample.for.fore.experiment.RData')
+```
+
+
+```{r, eval = TRUE, fig.cap='Example of ETAS sample with spatially varying background rate.', fig.height=5}
+load('Generated_data/sample.for.fore.experiment.RData')
+pl.sample <-  ggplot() + geom_sf(data = europe) + gg(italy.contour)  + 
+  geom_point(data = ss1[order(ss1$mags), ], 
+             aes(x = x, y = y, fill = mags.class, shape = mags.class, size = mags)) + 
+  scale_shape_manual(values = seq(21, 24)) +
+  scale_fill_viridis(discrete = TRUE, option = 'magma') +
+  scale_size_continuous(guide = NULL) + 
+  xlim(italy.contour@bbox[1,]) + 
+  ylim(italy.contour@bbox[2,])
+
+pl.sample
+```
+
+
+```{r}
+# Weerd behaviour
+# super weird behaviour
+pmvnorm(lower = c(italy.contour@bbox[1,1], italy.contour@bbox[2,1]), 
+        upper = c(italy.contour@bbox[1,2], italy.contour@bbox[2,2]),
+        mean = c(14.5, 36.4), sigma = Sigma)
+
+
+pmvnorm(lower = c(italy.contour@bbox[1,1], italy.contour@bbox[2,1]), 
+        upper = c(italy.contour@bbox[1,2], italy.contour@bbox[2,2]),
+        mean = c(14.4, 36.8), sigma = Sigma)
+```
+
+# Example space-time forecasting
+
+Here, we present an example of a forecasting experiment. We generate data for two years using the above values of $\boldsymbol \theta$ and we use this sample as observed data. Then, we split the time in 2-week intervals. For each interval, we simulate 1000 sequences from a target model, assuming to have knowledge of the events before the forecasted interval. The plot below shows the observed number of events in each bin and the intervals containing the 95% of the numbers of events of the simulated sequences.  
+
+```{r}
+ss1$mags.class <- NULL
+ss1$gen <- NULL
+t.breaks <- seq(0,2,by = 1/24) # monthly prediction #c(0,1,2,3,4)
+
+bk.list <- list(loglambda = log(italy.mesh.df$bk.field),
+                mesh = italy.mesh)
+
+store.res <- run.fore.experiment(theta.v, beta.p = 2.3, M0 = 2.5, bdy = italy.contour, 
+                                 crsobj = crswgs, t.breaks = t.breaks, testing.data = ss1, 
+                                 bk.field.list = bk.list, ncore = 7, nsim = 1000)
+
+save(store.res, file = 'res.simulation.forecast.RData')
+```
+
+```{r, eval = TRUE, fig.cap='Simulated predictive intervals for each time bin. Segments represents 95% predictive intervals, red dots represents observed values and orange squares indicates events with magnitude greater than 4.5. Each simulated interval is obtained simulating 1000 sequences in the respective time bin assuming to know the past events.', fig.height=4}
+load('Generated_data/res.simulation.forecast.RData')
+t.breaks <- seq(0,2,by = 1/24)
+store.res <- data.frame(store.res)
+colnames(store.res) <- c('q0.025', 'q0.5', 'q0.975', 'true')
+store.res$t.mids <- t.breaks[-length(t.breaks)] + (1/24)/2
+store.res$contained <- store.res$q0.025 <= store.res$true & store.res$true <= store.res$q0.975
+ggplot(store.res, aes(x = t.mids, y = q0.5)) + 
+  #geom_ribbon(aes(ymin = q0.05, ymax = q0.95), alpha = 0.5, fill = 'lightblue', color = 'blue') +
+  geom_segment(aes(x = t.mids, xend = t.mids, y = q0.025, yend = q0.975)) + 
+  geom_point() + 
+  geom_point(aes(y = true), color = 'red') + 
+  geom_point(data = ss1[ss1$mags > 4.5,], aes(x = ts, y = 100), shape = 22, size = 3, 
+             fill = 'orange')
+```
+
