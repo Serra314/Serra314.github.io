@@ -1,8 +1,9 @@
 library(inlabru)
 library(INLA)
-
+library(ggplot2)
 ## Import data
 
+# page 56 - 70
 data(SPDEtoy)
 
 ## create a polygon to define the study region
@@ -10,6 +11,7 @@ data(SPDEtoy)
 pl.dom <- cbind(c(0, 1, 1, 0.7, 0), c(0, 0, 0.7, 1, 1))
 mesh5 <- inla.mesh.2d(loc.domain = pl.dom, max.e = c(0.092, 0.2))
 
+# function gg() plots automatically various kind of data.
 ggplot() + gg(mesh5)
 
 # create an spde object with pc.prior
@@ -44,7 +46,7 @@ spde5 <- inla.spde2.pcmatern(
 coordinates(SPDEtoy) = c('s1', 's2')
 class(SPDEtoy)
 
-cmp <- y ~ Intercept + gmrf(map = coordinates, model = spde5) 
+cmp <- y ~ Intercept + gmrf(main = coordinates, model = spde5) 
 
 fit.bru <- bru(components = cmp,
                family = 'gaussian',
@@ -59,6 +61,7 @@ p1 <- plot(fit.bru, 'Intercept') + xlab(expression(alpha))
 p2 <- plot(fit.bru, 'Range for gmrf') + xlab(expression(rho))
 p3 <- plot(fit.bru, 'Stdev for gmrf') + xlab(expression(sigma[epsilon]))
 p4 <- plot(fit.bru, 'Precision for the Gaussian observations') + xlab(expression(tau))
+# inlabru function to merge different ggplot obj. Quite useful
 multiplot(p1, p2, p3, p4, layout = matrix(c(1,2,3,4), byrow = TRUE, ncol = 2))
 
 
