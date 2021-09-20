@@ -166,7 +166,7 @@ Where $\textbf Z \sim N(\textbf s_i, \Sigma)$ it's a multivariate Gaussian distr
 
 # ETAS sampling
 
-Here, a small example of two sequences using paramers $\boldsymbol \theta = (-4.60, -2.99, 0.095, -4.60, -2.30, -6.21, -6.21, -6.26)$ which correspond to parameters $\mu = 1e-2, K = 0.05, \alpha = 1.1, c = 1e-2, p = 1.1, \sigma^2_x = \sigma^2_y 0.002, \sigma_{xy} = 0.0019$. The points are generated in the square box $(0,1) \times (0,1)$ and time comprised between $0$ and $1$. The magnitude follow a GR law with parameter $\beta = 2.3$ which correspond to $b = \beta/\log(10) = 0.99$. Two spatial triggering functions are considered. One is isotropic, which correspond to $\sigma_{xy} = 0$ and the other one is not isotropic and has $\sigma_{xy} = 0.0019$. 
+Here, a small example of two sequences using paramers $\boldsymbol \theta = (-4.60, -2.99, 0.095, -4.60, -2.30, -6.21, -6.21, -6.26)$ which correspond to parameters $\mu = 10^{-2}, K = 0.05, \alpha = 1.1, c = 10^{-2}, p = 1.1, \sigma^2_x = \sigma^2_y = 0.002, \sigma_{xy} = 0.0019$. The points are generated in the square box $(0,1) \times (0,1)$ and time comprised between $0$ and $1$. The magnitude follow a GR law with parameter $\beta = 2.3$ which correspond to $b = \beta/\log(10) = 0.99$. Two spatial triggering functions are considered. One is isotropic, which correspond to $\sigma_{xy} = 0$ and the other one is not isotropic and has $\sigma_{xy} = 0.0019$. 
 
 The algorithm to sample from an ETAS model in the time interval $T_1, T_2$ and space region $W$ works as follows:
 
@@ -322,7 +322,6 @@ save(italy.mesh.df, file = 'italy.mesh.df.RData')
 
 
 ```{r, eval = TRUE}
-load('HORUS_Ita_Catalog/italy.horus_2.5_00_20.RData')
 load('Generated_data/italy.mesh.df.RData')
 ```
 
