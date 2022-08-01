@@ -1,0 +1,164 @@
+---
+title: "Animations with R - Tutorial"
+author: "Francesco Serafini"
+date: "18/03/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Creating Animations from frame files
+
+Different techniques exists to create Gifs and animations with R. The way that I like the most is to create and store png files representing the frames and glue them together in an animation. Packages exists that does that automatically like $\texttt{gganimate}$ but the syntax may be complicated and, as said, I found this way easier. The packages needed for this are  
+
+```{r, eval = FALSE}
+library(magick) # to create animation
+library(magrittr) # to create animation
+library(gtools) # to sort file names correctly
+```
+
+Then, the first step is creating the files to be used as frames later on. We want to animate the weekly forecasts obtained in the Colfiorito example. Specifically, we consider the forecasted probability of activity. The animation will contains four panels: spatial distribution of the weekly event (top-right), running histogram of the counts per week (top-left), 2D map of forecasted probabilities of activity, 2D map of observed activity. We do not inlcude the code needed to import all the files that have created in the example document. 
+
+```{r, eval = FALSE, echo = FALSE}
+library(rnaturalearth)
+library(ggplot2)
+library(viridis)
+load('utilities/colfiorito.97_99.Rds')
+
+# load italy map
+it.map <- ne_countries(country = 'Italy', returnclass = "sf", scale = 'medium')
+# extract crs
+italy.crs <- crs(it.map)
+# create sp object
+colfiorito.sp.97_99 <- colfiorito.ds.97_99
+coordinates(colfiorito.sp.97_99) <- c('Lon', 'Lat')
+# create sf object
+colfiorito.sf.97_99 <- st_as_sf(colfiorito.sp.97_99)
+# project sf object
+st_crs(colfiorito.sf.97_99) <- italy.crs#"+proj=longlat +datum=WGS84 +no_defs"#"+proj=utm +zone=33"
+colfiorito.sf.97_99 <- st_transform(colfiorito.sf.97_99, italy.crs)
+
+# create Polygon representing study region
+x.lims <- c(12, 13.5)
+y.lims <- c(42, 44)
+x_coords <- c(x.lims[1],x.lims[2],x.lims[2],x.lims[1],x.lims[1])
+y_coords <- c(y.lims[1],y.lims[1],y.lims[2],y.lims[2],y.lims[1])
+poly1 <- sp::Polygon(cbind(x_coords,y_coords))
+bdy <- sp::Polygons(list(poly1), ID = "A")
+bdy <- sp::SpatialPolygons(list(bdy))
+# create sf object
+bdy.sf <- st_as_sf(bdy)
+st_crs(bdy.sf) <- italy.crs
+bdy.sf <- st_transform(bdy.sf, italy.crs)
+
+# starting date of the sequence (I have chosen this one because the first event is isolated in time)
+start.date <- min(colfiorito.ds.97_99$time_date[-1]) 
+
+# create data.frame (variable names are mandatory)
+df.bru <- data.frame(x = colfiorito.ds.97_99$Lon, # x for longitude 
+                     y = colfiorito.ds.97_99$Lat, # y for latitude
+                     ts = as.numeric(difftime(colfiorito.ds.97_99$time_date, 
+                                              start.date,
+                                              units = 'days')), # ts for time (in secs, hours, days)
+                     mags = colfiorito.ds.97_99$Mw) # mags for magnitudes
+# remove the first two rows (first has negative time and the second has time equal 0)
+df.bru <- df.bru[-c(1,2),]
+
+# divide the first 100 weeks of data
+list.weeks <- foreach(i = 1:100) %do% {
+  df.bru[df.bru$ts >= (i-1)*7 & df.bru$ts <= (i)*7,]
+}
+weeks.to.fore <- list.weeks[28:47]
+
+N.weeks <- unlist(lapply(weeks.to.fore, nrow))
+load('utilities/list.pixels.prob.Rds')
+```
+
+Below the code to iteratively create the plots representing the animation's frames. It is just a for loop which creates four plots (the four panels) and arrange them together using Inlabru. It is necessary that the frames are saved in a separate folder with inside the frames only. This is because the next step will be to take all the files in the folder and create the animation from those.
+
+```{r, eval = FALSE}
+# for each week
+for(idx in 1:length(weeks.to.fore)){
+  # extract catalogue
+  samp.cat <- weeks.to.fore[[idx]]
+  # extract locations
+  week.data <- samp.cat[,c('x', 'y')]
+  # initialize raster
+  raster.grid <- raster(bdy, nrows = 50, ncols = 50)
+  raster.grid[] <- 0
+  # counts per cell
+  counts_ <- table(cellFromXY(raster.grid, week.data))
+  # cell value become 1 if positive number of events
+  raster.grid[as.numeric(names(counts_))] <- 1
+  # turn it in SpatialPixels obj for plotting
+  week.sp <- as(raster.grid, 'SpatialPixelsDataFrame')
+  # turn the catalogue in sf object for plotting on Italy map
+  samp.cat.sp <- samp.cat
+  coordinates(samp.cat.sp) <- c('x', 'y')
+  samp.cat.sf <- st_as_sf(samp.cat.sp)
+  st_crs(samp.cat.sf) <- italy.crs
+  samp.cat.sf <- st_transform(samp.cat.sf, italy.crs)
+  
+  # forecast of activity (produced and stored in the example document)
+  pl.pred <- ggplot() + 
+    gg(list.pixels.prob[[idx]]) +
+    labs(title = paste0('Forecast - week ', idx), fill = 'prob') + 
+    theme(legend.position = 'bottom') + 
+    scale_fill_viridis(limits = c(0,1))
+  
+  # observed activity
+  pl.obs <- ggplot() + 
+    gg(week.sp) +
+    labs(title = paste0('Observed - week ', idx), fill = 'activity') + 
+    theme(legend.position = 'bottom')+
+    scale_fill_viridis()
+  # observed seismicity - 2D
+  p.2d <- ggplot() + 
+    geom_sf(data = it.map) +
+    geom_sf(data = bdy.sf, color = 'green') + 
+    geom_sf(data = samp.cat.sf, size = 1.5) + 
+    geom_sf(data = samp.cat.sf[samp.cat.sf$mags >= 5, ], shape = 24, fill = 'red', size = 2.5) + 
+    labs(title = paste0('week = ', idx)) 
+  
+  week.part <- weeks.to.fore[1:idx]
+  NN <- sapply(week.part, nrow)
+  # observed seismicity - histogram
+  p.bar <- ggplot() + geom_bar(aes(x = 1:idx, y = NN), stat = 'identity') + 
+    xlim(0,20) + 
+    ylim(0, max(N.weeks)) +
+    geom_vline(xintercept = idx + 0.5) +
+    ylab('Counts') + 
+    xlab('Weeks')
+  
+  
+  # save image as png in a specific folder
+  png(paste0('image_to_anim/frame', idx, '.png'), width = 480*1.5, height = 480*1.5)
+  
+  multiplot(p.2d, p.bar, pl.pred, pl.obs, 
+            layout = matrix(1:4, byrow = TRUE, ncol = 2))
+  dev.off()
+}
+```
+
+Now, we just need to extract the file names and this vector of files names will be used to create the animation. The frames in the animation will be in the same order as provided in the file names vector, R automatically order them as character (like frame10 before frame2) and we need to use a specific function to get the right sorting (i.e. $\texttt{mixedsort}$).
+
+```{r, eval = FALSE}
+# extract the files name
+nn <- list.files(path='utilities/image_to_anim/', pattern = '*.png', full.names = TRUE)
+# produce animation
+mixedsort(nn) %>%  # this also sorts the files name
+        image_read() %>% # reads each path file
+        image_join() %>% # joins image
+        image_animate(fps=2) %>% # animates, different options are available
+        image_write("Fore_activity.gif") # save
+
+```
+
+Then, we can just include them using $\texttt{include_graphics}$ function, unfortunately, it doesn't work on pdf outputs, but works nicely on html ones.
+
+```{r}
+knitr::include_graphics('Fore_activity.gif')
+```
+
